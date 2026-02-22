@@ -8,6 +8,8 @@ from sqlalchemy.exc import IntegrityError
 from app.database import get_db
 from app.schemas.admin import AdminCreate, AdminLogin, AdminResponse, Token
 from app.services.auth_service import create_admin, authenticate_admin, create_admin_token
+from app.api.deps import get_current_admin
+from app.models.admin import AdminUser
 
 
 router = APIRouter()
@@ -16,11 +18,11 @@ router = APIRouter()
 @router.post("/register", response_model=AdminResponse, status_code=status.HTTP_201_CREATED)
 async def register_admin(
     admin_data: AdminCreate,
+    current_admin: AdminUser = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Register a new admin user.
-    For initial setup or adding new teachers.
+    Register a new admin user. Requires admin authentication.
     """
     try:
         admin = await create_admin(db, admin_data)

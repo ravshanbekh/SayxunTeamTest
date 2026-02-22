@@ -34,6 +34,7 @@
                 <li><a href="#" data-page="tests">Testlarni boshqarish</a></li>
 
                 <li><a href="#" data-page="students">Talabalar</a></li>
+                <li><a href="#" data-page="admins">Adminlar</a></li>
                 <li><a href="#" id="logout-btn">Chiqish</a></li>
             </ul>
         </nav>
@@ -59,6 +60,13 @@
             <div class="page" id="students-page">
                 <h1>Talabalar</h1>
                 <div class="students-list" id="students-list"></div>
+            </div>
+
+            <!-- Admins -->
+            <div class="page" id="admins-page">
+                <h1>Adminlar</h1>
+                <button class="btn-primary" id="add-admin-btn">+ Yangi admin qo'shish</button>
+                <div class="admin-list" id="admin-list" style="margin-top: 20px;"></div>
             </div>
         </main>
     </div>
@@ -134,6 +142,27 @@
                 <div class="modal-actions">
                     <button type="button" class="btn-secondary" id="cancel-edit">Bekor qilish</button>
                     <button type="submit" class="btn-primary">💾 Saqlash</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Admin Modal -->
+    <div class="modal hidden" id="add-admin-modal">
+        <div class="modal-content" style="max-width: 400px;">
+            <h2>👤 Yangi admin qo'shish</h2>
+            <form id="add-admin-form">
+                <div class="form-group">
+                    <label>Foydalanuvchi nomi</label>
+                    <input type="text" id="new-admin-username" required minlength="3">
+                </div>
+                <div class="form-group">
+                    <label>Parol</label>
+                    <input type="password" id="new-admin-password" required minlength="4">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" id="cancel-add-admin">Bekor qilish</button>
+                    <button type="submit" class="btn-primary">✅ Qo'shish</button>
                 </div>
             </form>
         </div>

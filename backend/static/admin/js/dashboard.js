@@ -54,6 +54,7 @@ document.querySelectorAll('.menu a[data-page]').forEach(link => {
 
 
         if (page === 'students') loadStudents();
+        if (page === 'admins') loadAdmins();
     });
 });
 
@@ -498,3 +499,54 @@ async function extendAllSessions(testId, testTitle) {
 if (isLoggedIn()) {
     loadDashboard();
 }
+
+// =================== ADMIN MANAGEMENT ===================
+
+// Load admins list
+async function loadAdmins() {
+    const container = document.getElementById('admin-list');
+    container.innerHTML = '<p style="color: #666;">Adminlar ro\'yxati faqat yangi admin qo\'shish uchun.</p>';
+}
+
+// Open add admin modal
+document.getElementById('add-admin-btn').addEventListener('click', () => {
+    document.getElementById('add-admin-modal').classList.remove('hidden');
+    document.getElementById('new-admin-username').value = '';
+    document.getElementById('new-admin-password').value = '';
+});
+
+// Cancel add admin
+document.getElementById('cancel-add-admin').addEventListener('click', () => {
+    document.getElementById('add-admin-modal').classList.add('hidden');
+});
+
+// Submit new admin
+document.getElementById('add-admin-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const username = document.getElementById('new-admin-username').value.trim();
+    const password = document.getElementById('new-admin-password').value;
+
+    if (!username || !password) {
+        alert('Foydalanuvchi nomi va parolni kiriting!');
+        return;
+    }
+
+    if (password.length < 4) {
+        alert('Parol kamida 4 ta belgidan iborat bo\'lishi kerak!');
+        return;
+    }
+
+    try {
+        const response = await apiRequest('/api/v1/auth/register', {
+            method: 'POST',
+            body: JSON.stringify({ username, password })
+        });
+
+        const data = await response.json();
+        alert(`✅ Admin "${data.username}" muvaffaqiyatli qo'shildi!`);
+        document.getElementById('add-admin-modal').classList.add('hidden');
+    } catch (error) {
+        alert('❌ Xatolik: ' + error.message);
+    }
+});
