@@ -26,7 +26,7 @@ router = APIRouter()
 @router.get("/students", response_model=List[UserResponse])
 async def get_all_students(
     skip: int = 0,
-    limit: int = 100,
+    limit: int = 5000,
     db: AsyncSession = Depends(get_db),
     current_admin: AdminUser = Depends(get_current_admin)
 ):

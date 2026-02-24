@@ -61,7 +61,7 @@ document.querySelectorAll('.menu a[data-page]').forEach(link => {
 // Load dashboard
 async function loadDashboard() {
     try {
-        const response = await apiRequest('/api/v1/admin/students');
+        const response = await apiRequest('/api/v1/admin/students?limit=5000');
         const students = await response.json();
 
         const statsHtml = `
@@ -135,7 +135,7 @@ async function loadTests() {
 // Load students
 async function loadStudents() {
     try {
-        const response = await apiRequest('/api/v1/admin/students');
+        const response = await apiRequest('/api/v1/admin/students?limit=5000');
         const students = await response.json();
 
         let html = '<table><tr><th>Ism</th><th>Familiya</th><th>Viloyat</th><th>Ro\'yxatdan o\'tgan</th></tr>';
