@@ -154,7 +154,7 @@ async function loadStudents() {
 // Export functions
 async function exportExcel(testId) {
     try {
-        const response = await fetch(`${API_BASE}/api/v1/admin/export/${testId}/excel`, {
+        const response = await fetch(`${API_BASE}/api/v1/admin/reports/${testId}/excel`, {
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
             }
@@ -174,7 +174,7 @@ async function exportExcel(testId) {
 
 async function exportPDF(testId) {
     try {
-        const response = await fetch(`${API_BASE}/api/v1/admin/export/${testId}/pdf`, {
+        const response = await fetch(`${API_BASE}/api/v1/admin/reports/${testId}/pdf`, {
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
             }

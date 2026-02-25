@@ -80,7 +80,7 @@ async def grade_written_answer_endpoint(
     return WrittenAnswerResponse.model_validate(written_answer)
 
 
-@router.get("/export/{test_id}/excel")
+@router.get("/reports/{test_id}/excel")
 async def export_test_results_excel(
     test_id: UUID,
     db: AsyncSession = Depends(get_db),
@@ -114,7 +114,7 @@ async def export_test_results_excel(
     )
 
 
-@router.get("/export/{test_id}/pdf")
+@router.get("/reports/{test_id}/pdf")
 async def export_test_results_pdf(
     test_id: UUID,
     db: AsyncSession = Depends(get_db),
