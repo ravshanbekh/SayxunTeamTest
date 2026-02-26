@@ -164,12 +164,6 @@ async def export_results_to_excel(db: AsyncSession, test_id: UUID, filepath: str
         cell.font = header_font
         cell.alignment = Alignment(horizontal="center", vertical="center")
     
-    # Color fills
-    green_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
-    green_font = Font(color="006100")
-    red_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
-    red_font = Font(color="9C0006")
-    
     # Data rows - no more per-row DB queries!
     t_rows = time.time()
     for result_record in results:
@@ -184,24 +178,7 @@ async def export_results_to_excel(db: AsyncSession, test_id: UUID, filepath: str
             _build_row_data(user, result_record, mcq_answers, written_answers, written_answers_key)
         
         row_data = [student_info, total_score] + mcq_values + written_values
-        
-        row_num = ws.max_row + 1
         ws.append(row_data)
-        
-        # Color code answer cells (columns 3 onwards)
-        for col_offset in range(len(row_data) - 2):
-            col_num = 3 + col_offset
-            cell = ws.cell(row=row_num, column=col_num)
-            value = row_data[2 + col_offset]
-            
-            if value == 1:
-                cell.fill = green_fill
-                cell.font = green_font
-            else:
-                cell.fill = red_fill
-                cell.font = red_font
-            
-            cell.alignment = Alignment(horizontal="center")
     
     t_excel = time.time()
     logger.info(f"[EXPORT] Excel rows built: {(t_excel-t_rows)*1000:.0f}ms")
@@ -288,7 +265,6 @@ async def export_results_to_pdf(db: AsyncSession, test_id: UUID, filepath: str) 
         headers.extend([f"{i}a", f"{i}b"])
     
     table_data = [headers]
-    cell_values = []
     
     # Data rows - no more per-row DB queries!
     t_rows = time.time()
@@ -307,10 +283,7 @@ async def export_results_to_pdf(db: AsyncSession, test_id: UUID, filepath: str) 
         row.extend(str(v) for v in mcq_values)
         row.extend(str(v) for v in written_values)
         
-        all_values = mcq_values + written_values
-        
         table_data.append(row)
-        cell_values.append(all_values)
     
     t_pdf_rows = time.time()
     logger.info(f"[EXPORT] PDF rows built: {(t_pdf_rows-t_rows)*1000:.0f}ms")
@@ -342,22 +315,9 @@ async def export_results_to_pdf(db: AsyncSession, test_id: UUID, filepath: str) 
         ('RIGHTPADDING', (0, 0), (-1, -1), 2),
         # Left-align Talaba column
         ('ALIGN', (0, 1), (0, -1), 'LEFT'),
+        # Alternate row shading for readability
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F2F2F2')]),
     ]
-    
-    # Color code answer cells
-    green_bg = colors.HexColor('#C6EFCE')
-    red_bg = colors.HexColor('#FFC7CE')
-    
-    for row_idx, row_vals in enumerate(cell_values):
-        data_row = row_idx + 1
-        for col_idx, val in enumerate(row_vals):
-            data_col = col_idx + 2  # +2 for Talaba, Bal
-            if val == 1:
-                style_commands.append(('BACKGROUND', (data_col, data_row), (data_col, data_row), green_bg))
-                style_commands.append(('TEXTCOLOR', (data_col, data_row), (data_col, data_row), colors.HexColor('#006100')))
-            else:
-                style_commands.append(('BACKGROUND', (data_col, data_row), (data_col, data_row), red_bg))
-                style_commands.append(('TEXTCOLOR', (data_col, data_row), (data_col, data_row), colors.HexColor('#9C0006')))
     
     results_table.setStyle(TableStyle(style_commands))
     elements.append(results_table)
