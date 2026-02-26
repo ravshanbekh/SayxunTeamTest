@@ -1,5 +1,6 @@
 """
 Export service for generating Excel and PDF reports.
+Optimized: batch-loads all data in ~4 queries instead of N+1.
 """
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment
@@ -15,48 +16,136 @@ from typing import List
 from uuid import UUID
 from datetime import datetime
 import os
+import json as _json
+import time
+import logging
 
-from app.models.result import Result, MCQAnswer
+from app.models.result import Result, MCQAnswer, WrittenAnswer
 from app.models.user import User
-from app.models.test import Test
+from app.models.test import Test, AnswerKey
 from app.config import settings
+
+logger = logging.getLogger(__name__)
+
+
+async def _load_export_data(db: AsyncSession, test_id: UUID):
+    """
+    Batch-load all data needed for export in ~4 queries.
+    Returns (test, results, users_dict, mcq_dict, written_dict, written_answers_key)
+    """
+    t0 = time.time()
+
+    # 1. Test
+    stmt = select(Test).where(Test.id == test_id)
+    res = await db.execute(stmt)
+    test = res.scalars().first()
+    t1 = time.time()
+    logger.info(f"[EXPORT] Test loaded: {(t1-t0)*1000:.0f}ms")
+
+    # 2. Results
+    stmt = select(Result).where(Result.test_id == test_id).order_by(Result.submitted_at)
+    res = await db.execute(stmt)
+    results = res.scalars().all()
+    result_ids = [r.id for r in results]
+    user_ids = list(set(r.user_id for r in results))
+    t2 = time.time()
+    logger.info(f"[EXPORT] {len(results)} results loaded: {(t2-t1)*1000:.0f}ms")
+
+    # 3. All users in one query
+    stmt = select(User).where(User.id.in_(user_ids))
+    res = await db.execute(stmt)
+    users_list = res.scalars().all()
+    users_dict = {u.id: u for u in users_list}
+    t3 = time.time()
+    logger.info(f"[EXPORT] {len(users_list)} users loaded: {(t3-t2)*1000:.0f}ms")
+
+    # 4. All MCQ answers in one query
+    stmt = select(MCQAnswer).where(MCQAnswer.result_id.in_(result_ids)).order_by(MCQAnswer.question_number)
+    res = await db.execute(stmt)
+    all_mcq = res.scalars().all()
+    mcq_by_result = {}
+    for ans in all_mcq:
+        mcq_by_result.setdefault(ans.result_id, []).append(ans)
+    t4 = time.time()
+    logger.info(f"[EXPORT] {len(all_mcq)} MCQ answers loaded: {(t4-t3)*1000:.0f}ms")
+
+    # 5. All written answers in one query
+    stmt = select(WrittenAnswer).where(WrittenAnswer.result_id.in_(result_ids)).order_by(WrittenAnswer.question_number)
+    res = await db.execute(stmt)
+    all_written = res.scalars().all()
+    written_by_result = {}
+    for ans in all_written:
+        written_by_result.setdefault(ans.result_id, []).append(ans)
+    t5 = time.time()
+    logger.info(f"[EXPORT] {len(all_written)} written answers loaded: {(t5-t4)*1000:.0f}ms")
+
+    # 6. Answer key
+    stmt = select(AnswerKey).where(AnswerKey.test_id == test_id)
+    res = await db.execute(stmt)
+    answer_key = res.scalars().first()
+    written_answers_key = (answer_key.written_questions or {}) if answer_key else {}
+
+    total = time.time() - t0
+    logger.info(f"[EXPORT] Total DB load: {total*1000:.0f}ms for {len(results)} results (6 queries)")
+
+    return test, results, users_dict, mcq_by_result, written_by_result, written_answers_key
+
+
+def _build_row_data(user, result_record, mcq_answers, written_answers, written_answers_key):
+    """Build a single row of data for export (shared between Excel and PDF)."""
+    student_info = f"{user.full_name or ''} {user.surname or ''} - {user.region or ''}"
+    
+    # MCQ answers as 0/1 (Q1-Q35)
+    mcq_dict = {ans.question_number: ans for ans in mcq_answers}
+    mcq_values = []
+    for q_num in range(1, 36):
+        ans = mcq_dict.get(q_num)
+        mcq_values.append(1 if (ans and ans.is_correct) else 0)
+    
+    # Written answers as 0/1 per sub-part (Q36a, Q36b, ... Q45a, Q45b)
+    written_dict = {ans.question_number: ans for ans in written_answers}
+    written_values = []
+    for q_num in range(36, 46):
+        written_ans = written_dict.get(q_num)
+        correct_ans = written_answers_key.get(str(q_num), {})
+        
+        if written_ans and written_ans.student_answer:
+            try:
+                student = _json.loads(written_ans.student_answer)
+            except (ValueError, TypeError):
+                student = {}
+            
+            s_a = str(student.get('a', '')).strip().lower() if student.get('a') else ''
+            c_a = str(correct_ans.get('a', '')).strip().lower() if correct_ans.get('a') else ''
+            written_values.append(1 if (s_a and c_a and s_a == c_a) else 0)
+            
+            s_b = str(student.get('b', '')).strip().lower() if student.get('b') else ''
+            c_b = str(correct_ans.get('b', '')).strip().lower() if correct_ans.get('b') else ''
+            written_values.append(1 if (s_b and c_b and s_b == c_b) else 0)
+        else:
+            written_values.append(0)  # Q_a
+            written_values.append(0)  # Q_b
+    
+    return student_info, result_record.total_score, mcq_values, written_values
 
 
 async def export_results_to_excel(db: AsyncSession, test_id: UUID, filepath: str) -> str:
     """
     Export test results to Excel file.
     Shows 0 (wrong) / 1 (correct) for each question.
-    
-    Args:
-        db: Database session
-        test_id: Test UUID
-        filepath: Output file path
-    
-    Returns:
-        File path of generated Excel
     """
-    # Get test and results
-    stmt = select(Test).where(Test.id == test_id)
-    result = await db.execute(stmt)
-    test = result.scalars().first()
+    t_start = time.time()
     
-    stmt = select(Result).where(Result.test_id == test_id).order_by(Result.submitted_at)
-    result = await db.execute(stmt)
-    results = result.scalars().all()
-    
-    # Get answer key for written question grading info
-    from app.models.test import AnswerKey
-    stmt = select(AnswerKey).where(AnswerKey.test_id == test_id)
-    ak_result = await db.execute(stmt)
-    answer_key = ak_result.scalars().first()
-    written_answers_key = (answer_key.written_questions or {}) if answer_key else {}
+    # Batch load all data
+    test, results, users_dict, mcq_by_result, written_by_result, written_answers_key = \
+        await _load_export_data(db, test_id)
     
     # Create workbook
     wb = Workbook()
     ws = wb.active
     ws.title = "Test Results"
     
-    # Headers: Talaba, Correct, Q1-Q35, Q36a, Q36b, Q37a, Q37b
+    # Headers
     headers = ["Talaba", "Correct"]
     for i in range(1, 36):
         headers.append(f"Q{i}")
@@ -81,69 +170,25 @@ async def export_results_to_excel(db: AsyncSession, test_id: UUID, filepath: str
     red_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
     red_font = Font(color="9C0006")
     
-    # Data rows
+    # Data rows - no more per-row DB queries!
+    t_rows = time.time()
     for result_record in results:
-        # Get user
-        stmt = select(User).where(User.id == result_record.user_id)
-        user_result = await db.execute(stmt)
-        user = user_result.scalars().first()
+        user = users_dict.get(result_record.user_id)
+        if not user:
+            continue
         
-        # Get MCQ answers
-        stmt = select(MCQAnswer).where(MCQAnswer.result_id == result_record.id).order_by(MCQAnswer.question_number)
-        mcq_result = await db.execute(stmt)
-        mcq_answers = mcq_result.scalars().all()
+        mcq_answers = mcq_by_result.get(result_record.id, [])
+        written_answers = written_by_result.get(result_record.id, [])
         
-        # Get written answers
-        from app.models.result import WrittenAnswer
-        stmt = select(WrittenAnswer).where(WrittenAnswer.result_id == result_record.id).order_by(WrittenAnswer.question_number)
-        written_result = await db.execute(stmt)
-        written_answers = written_result.scalars().all()
+        student_info, total_score, mcq_values, written_values = \
+            _build_row_data(user, result_record, mcq_answers, written_answers, written_answers_key)
         
-        student_info = f"{user.full_name} {user.surname} - {user.region}"
-        row_data = [
-            student_info,
-            result_record.total_score
-        ]
-        
-        # Add MCQ answers as 0/1 (Q1-Q35)
-        mcq_dict = {ans.question_number: ans for ans in mcq_answers}
-        for q_num in range(1, 36):
-            ans = mcq_dict.get(q_num)
-            if ans:
-                row_data.append(1 if ans.is_correct else 0)
-            else:
-                row_data.append(0)
-        
-        # Add written answers as 0/1 per sub-part (Q36a, Q36b, Q37a, Q37b)
-        written_dict = {ans.question_number: ans for ans in written_answers}
-        for q_num in range(36, 46):
-            written_ans = written_dict.get(q_num)
-            correct_ans = written_answers_key.get(str(q_num), {})
-            
-            if written_ans and written_ans.student_answer:
-                import json as _json
-                try:
-                    student = _json.loads(written_ans.student_answer)
-                except (ValueError, TypeError):
-                    student = {}
-                
-                # Compare sub-part a
-                s_a = str(student.get('a', '')).strip().lower() if student.get('a') else ''
-                c_a = str(correct_ans.get('a', '')).strip().lower() if correct_ans.get('a') else ''
-                row_data.append(1 if (s_a and c_a and s_a == c_a) else 0)
-                
-                # Compare sub-part b
-                s_b = str(student.get('b', '')).strip().lower() if student.get('b') else ''
-                c_b = str(correct_ans.get('b', '')).strip().lower() if correct_ans.get('b') else ''
-                row_data.append(1 if (s_b and c_b and s_b == c_b) else 0)
-            else:
-                row_data.append(0)  # Q_a
-                row_data.append(0)  # Q_b
+        row_data = [student_info, total_score] + mcq_values + written_values
         
         row_num = ws.max_row + 1
         ws.append(row_data)
         
-        # Color code all answer cells (columns 3 onwards = Q1 starts at col 3)
+        # Color code answer cells (columns 3 onwards)
         for col_offset in range(len(row_data) - 2):
             col_num = 3 + col_offset
             cell = ws.cell(row=row_num, column=col_num)
@@ -158,6 +203,9 @@ async def export_results_to_excel(db: AsyncSession, test_id: UUID, filepath: str
             
             cell.alignment = Alignment(horizontal="center")
     
+    t_excel = time.time()
+    logger.info(f"[EXPORT] Excel rows built: {(t_excel-t_rows)*1000:.0f}ms")
+    
     # Auto-size columns
     for col_num in range(1, len(headers) + 1):
         column_letter = get_column_letter(col_num)
@@ -171,6 +219,9 @@ async def export_results_to_excel(db: AsyncSession, test_id: UUID, filepath: str
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     wb.save(filepath)
     
+    total = time.time() - t_start
+    logger.info(f"[EXPORT] Excel export TOTAL: {total*1000:.0f}ms for {len(results)} results")
+    
     return filepath
 
 
@@ -178,33 +229,14 @@ async def export_results_to_pdf(db: AsyncSession, test_id: UUID, filepath: str) 
     """
     Export test results to PDF file.
     Shows 0 (wrong) / 1 (correct) for each question, matching Excel format.
-    
-    Args:
-        db: Database session
-        test_id: Test UUID
-        filepath: Output file path
-    
-    Returns:
-        File path of generated PDF
     """
-    import json as _json
     from reportlab.lib.pagesizes import A3
     
-    # Get test and results
-    stmt = select(Test).where(Test.id == test_id)
-    result = await db.execute(stmt)
-    test = result.scalars().first()
+    t_start = time.time()
     
-    stmt = select(Result).where(Result.test_id == test_id).order_by(Result.submitted_at)
-    result = await db.execute(stmt)
-    results = result.scalars().all()
-    
-    # Get answer key for written question grading
-    from app.models.test import AnswerKey
-    stmt = select(AnswerKey).where(AnswerKey.test_id == test_id)
-    ak_result = await db.execute(stmt)
-    answer_key = ak_result.scalars().first()
-    written_answers_key = (answer_key.written_questions or {}) if answer_key else {}
+    # Batch load all data
+    test, results, users_dict, mcq_by_result, written_by_result, written_answers_key = \
+        await _load_export_data(db, test_id)
     
     # Create PDF - use landscape A3 to fit all columns
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
@@ -248,7 +280,7 @@ async def export_results_to_pdf(db: AsyncSession, test_id: UUID, filepath: str) 
     elements.append(summary)
     elements.append(Spacer(1, 0.3 * inch))
     
-    # Headers: Talaba, Bal, Q1-Q35, Q36a, Q36b, Q37a, Q37b
+    # Headers
     headers = ["Talaba", "Bal"]
     for i in range(1, 36):
         headers.append(f"Q{i}")
@@ -256,82 +288,40 @@ async def export_results_to_pdf(db: AsyncSession, test_id: UUID, filepath: str) 
         headers.extend([f"{i}a", f"{i}b"])
     
     table_data = [headers]
+    cell_values = []
     
-    # Track which cells are correct/wrong for coloring
-    cell_values = []  # list of lists, each inner list is the 0/1 values for that row
-    
+    # Data rows - no more per-row DB queries!
+    t_rows = time.time()
     for result_record in results:
-        # Get user
-        stmt = select(User).where(User.id == result_record.user_id)
-        user_result = await db.execute(stmt)
-        user = user_result.scalars().first()
+        user = users_dict.get(result_record.user_id)
+        if not user:
+            continue
         
-        # Get MCQ answers
-        stmt = select(MCQAnswer).where(MCQAnswer.result_id == result_record.id).order_by(MCQAnswer.question_number)
-        mcq_result = await db.execute(stmt)
-        mcq_answers = mcq_result.scalars().all()
+        mcq_answers = mcq_by_result.get(result_record.id, [])
+        written_answers = written_by_result.get(result_record.id, [])
         
-        # Get written answers
-        from app.models.result import WrittenAnswer
-        stmt = select(WrittenAnswer).where(WrittenAnswer.result_id == result_record.id).order_by(WrittenAnswer.question_number)
-        written_result = await db.execute(stmt)
-        written_answers = written_result.scalars().all()
+        student_info, total_score, mcq_values, written_values = \
+            _build_row_data(user, result_record, mcq_answers, written_answers, written_answers_key)
         
-        student_info = f"{user.full_name or ''} {user.surname or ''} - {user.region or ''}"
-        row = [
-            student_info,
-            str(result_record.total_score)
-        ]
+        row = [student_info, str(total_score)]
+        row.extend(str(v) for v in mcq_values)
+        row.extend(str(v) for v in written_values)
         
-        row_values = []
-        
-        # MCQ answers as 0/1
-        mcq_dict = {ans.question_number: ans for ans in mcq_answers}
-        for q_num in range(1, 36):
-            ans = mcq_dict.get(q_num)
-            val = 1 if (ans and ans.is_correct) else 0
-            row.append(str(val))
-            row_values.append(val)
-        
-        # Written answers as 0/1 per sub-part
-        written_dict = {ans.question_number: ans for ans in written_answers}
-        for q_num in range(36, 46):
-            written_ans = written_dict.get(q_num)
-            correct_ans = written_answers_key.get(str(q_num), {})
-            
-            if written_ans and written_ans.student_answer:
-                try:
-                    student = _json.loads(written_ans.student_answer)
-                except (ValueError, TypeError):
-                    student = {}
-                
-                s_a = str(student.get('a', '')).strip().lower() if student.get('a') else ''
-                c_a = str(correct_ans.get('a', '')).strip().lower() if correct_ans.get('a') else ''
-                val_a = 1 if (s_a and c_a and s_a == c_a) else 0
-                
-                s_b = str(student.get('b', '')).strip().lower() if student.get('b') else ''
-                c_b = str(correct_ans.get('b', '')).strip().lower() if correct_ans.get('b') else ''
-                val_b = 1 if (s_b and c_b and s_b == c_b) else 0
-            else:
-                val_a = 0
-                val_b = 0
-            
-            row.append(str(val_a))
-            row.append(str(val_b))
-            row_values.append(val_a)
-            row_values.append(val_b)
+        all_values = mcq_values + written_values
         
         table_data.append(row)
-        cell_values.append(row_values)
+        cell_values.append(all_values)
+    
+    t_pdf_rows = time.time()
+    logger.info(f"[EXPORT] PDF rows built: {(t_pdf_rows-t_rows)*1000:.0f}ms")
     
     # Calculate column widths
-    # Talaba column gets more space, question columns are narrow
     talaba_width = 2.2 * inch
     q_width = 0.28 * inch
     bal_width = 0.35 * inch
     
     col_widths = [talaba_width, bal_width]
-    col_widths.extend([q_width] * 55)  # Q1-Q35 + Q36a..Q45b
+    col_widths.extend([q_width] * 55)
     
     results_table = Table(table_data, colWidths=col_widths)
     
@@ -354,12 +344,12 @@ async def export_results_to_pdf(db: AsyncSession, test_id: UUID, filepath: str) 
         ('ALIGN', (0, 1), (0, -1), 'LEFT'),
     ]
     
-    # Color code answer cells (col 4 onwards = Q1, row 1 onwards = data)
+    # Color code answer cells
     green_bg = colors.HexColor('#C6EFCE')
     red_bg = colors.HexColor('#FFC7CE')
     
     for row_idx, row_vals in enumerate(cell_values):
-        data_row = row_idx + 1  # +1 for header
+        data_row = row_idx + 1
         for col_idx, val in enumerate(row_vals):
             data_col = col_idx + 2  # +2 for Talaba, Bal
             if val == 1:
@@ -372,7 +362,13 @@ async def export_results_to_pdf(db: AsyncSession, test_id: UUID, filepath: str) 
     results_table.setStyle(TableStyle(style_commands))
     elements.append(results_table)
     
+    t_style = time.time()
+    logger.info(f"[EXPORT] PDF styling: {(t_style-t_pdf_rows)*1000:.0f}ms")
+    
     # Build PDF
     doc.build(elements)
+    
+    total = time.time() - t_start
+    logger.info(f"[EXPORT] PDF export TOTAL: {total*1000:.0f}ms for {len(results)} results")
     
     return filepath
