@@ -299,16 +299,9 @@ function showResults(result) {
     let writtenHTML = '';
     if (writtenAnswers.length > 0) {
         writtenHTML = writtenAnswers.map(wa => {
-            const score = wa.score || 0;
-            let detail;
-            if (score === 2) {
-                detail = 'a) ✅  b) ✅';
-            } else if (score === 1) {
-                detail = '1/2 to\'g\'ri ⚠️';
-            } else {
-                detail = 'a) ❌  b) ❌';
-            }
-            return `<div class="result-written-item">${wa.question_number}-savol: ${detail}</div>`;
+            const iconA = (wa.score_a === 1) ? '✅' : '❌';
+            const iconB = (wa.score_b === 1) ? '✅' : '❌';
+            return `<div class="result-written-item">${wa.question_number}-savol: a) ${iconA}  b) ${iconB}</div>`;
         }).join('');
     }
 

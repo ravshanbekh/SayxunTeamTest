@@ -43,6 +43,8 @@ class WrittenAnswerResponse(BaseModel):
     question_number: int
     student_answer: str | None
     score: int
+    score_a: int | None = None
+    score_b: int | None = None
     reviewed_at: datetime | None
     
     class Config:

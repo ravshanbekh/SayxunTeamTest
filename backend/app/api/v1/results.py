@@ -6,13 +6,68 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from uuid import UUID
 from typing import List
+import json
+import re
 
 from app.database import get_db
 from app.schemas.result import ResultSubmit, ResultResponse, UserResultSummary, MCQAnswerResponse, WrittenAnswerResponse
 from app.services.session_service import get_session_by_token, mark_session_submitted
 from app.services.grading_service import grade_and_save_result, get_user_results
 from app.models.result import Result, MCQAnswer, WrittenAnswer
-from app.models.test import Test
+from app.models.test import Test, AnswerKey
+
+
+def _normalize(s):
+    """Normalize answer string for comparison."""
+    if not s:
+        return ''
+    s = str(s).strip().lower()
+    s = re.sub(r'\s+', ' ', s)
+    s = s.replace('\\left(', '(').replace('\\right)', ')')
+    s = s.replace('\\left[', '[').replace('\\right]', ']')
+    s = s.replace('\\cdot', '*').replace('\\times', '*')
+    return s
+
+
+async def _build_written_responses(db, written_answers_list, test_id):
+    """Build WrittenAnswerResponse list with per-sub-part scores (score_a, score_b)."""
+    # Load answer key
+    stmt = select(AnswerKey).where(AnswerKey.test_id == test_id)
+    ak_result = await db.execute(stmt)
+    answer_key = ak_result.scalars().first()
+    written_key = (answer_key.written_questions or {}) if answer_key else {}
+    
+    responses = []
+    for a in written_answers_list:
+        correct_ans = written_key.get(str(a.question_number), {})
+        
+        # Parse student answer JSON
+        student = {}
+        if a.student_answer:
+            try:
+                student = json.loads(a.student_answer)
+            except (ValueError, TypeError):
+                student = {}
+        
+        # Compare sub-parts
+        s_a = _normalize(student.get('a', ''))
+        c_a = _normalize(correct_ans.get('a', ''))
+        sa_correct = 1 if (s_a and c_a and (s_a == c_a or c_a in s_a)) else 0
+        
+        s_b = _normalize(student.get('b', ''))
+        c_b = _normalize(correct_ans.get('b', ''))
+        sb_correct = 1 if (s_b and c_b and (s_b == c_b or c_b in s_b)) else 0
+        
+        responses.append(WrittenAnswerResponse(
+            id=a.id,
+            question_number=a.question_number,
+            student_answer=a.student_answer,
+            score=a.score,
+            score_a=sa_correct,
+            score_b=sb_correct,
+            reviewed_at=a.reviewed_at
+        ))
+    return responses
 
 
 router = APIRouter()
@@ -53,6 +108,8 @@ async def submit_test(
             written_result = await db.execute(stmt)
             written_answers_list = written_result.scalars().all()
             
+            written_responses = await _build_written_responses(db, written_answers_list, existing_result.test_id)
+            
             return ResultResponse(
                 id=existing_result.id,
                 user_id=existing_result.user_id,
@@ -62,7 +119,7 @@ async def submit_test(
                 total_score=existing_result.total_score,
                 submitted_at=existing_result.submitted_at,
                 mcq_answers=[MCQAnswerResponse.model_validate(a) for a in mcq_answers_list],
-                written_answers=[WrittenAnswerResponse.model_validate(a) for a in written_answers_list]
+                written_answers=written_responses
             )
         
         raise HTTPException(
@@ -90,6 +147,8 @@ async def submit_test(
         written_answers_list = written_result.scalars().all()
         
         # Build response manually to avoid lazy loading issues
+        written_responses = await _build_written_responses(db, written_answers_list, result.test_id)
+        
         return ResultResponse(
             id=result.id,
             user_id=result.user_id,
@@ -99,7 +158,7 @@ async def submit_test(
             total_score=result.total_score,
             submitted_at=result.submitted_at,
             mcq_answers=[MCQAnswerResponse.model_validate(a) for a in mcq_answers_list],
-            written_answers=[WrittenAnswerResponse.model_validate(a) for a in written_answers_list]
+            written_answers=written_responses
         )
     except ValueError as e:
         raise HTTPException(
