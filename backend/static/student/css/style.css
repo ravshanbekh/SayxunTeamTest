@@ -411,3 +411,153 @@ math-field.math-input:focus-within {
         font-size: 16px;
     }
 }
+
+/* Results Page */
+.results-page {
+    animation: fadeIn 0.5s ease-in;
+}
+
+.results-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.results-check {
+    font-size: 64px;
+    margin-bottom: 10px;
+}
+
+.results-header h1 {
+    color: #2d8c46;
+    font-size: 24px;
+}
+
+.results-section {
+    margin-bottom: 30px;
+}
+
+.results-section h2 {
+    color: #333;
+    font-size: 20px;
+    margin-bottom: 15px;
+    padding-bottom: 8px;
+    border-bottom: 3px solid #667eea;
+}
+
+.results-mcq-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.result-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.result-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    min-width: 70px;
+    justify-content: center;
+}
+
+.result-correct {
+    background: #d4edda;
+    color: #155724;
+}
+
+.result-wrong {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.results-written-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.result-written-item {
+    background: #f8f9fa;
+    border: 2px solid #e9ecef;
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 15px;
+    font-weight: 500;
+}
+
+.results-summary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    padding: 24px;
+    color: white;
+}
+
+.results-summary h2 {
+    color: white;
+    font-size: 20px;
+    margin-bottom: 16px;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+    padding-bottom: 8px;
+}
+
+.results-scores {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.score-item {
+    flex: 1;
+    min-width: 100px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+}
+
+.score-label {
+    font-size: 14px;
+    opacity: 0.9;
+    margin-bottom: 6px;
+}
+
+.score-value {
+    font-size: 28px;
+    font-weight: bold;
+}
+
+.score-total {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+@media (max-width: 480px) {
+    .results-header h1 {
+        font-size: 20px;
+    }
+
+    .results-check {
+        font-size: 48px;
+    }
+
+    .result-item {
+        font-size: 12px;
+        padding: 5px 8px;
+        min-width: 58px;
+    }
+
+    .results-scores {
+        flex-direction: column;
+    }
+
+    .score-value {
+        font-size: 24px;
+    }
+}

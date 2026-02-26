@@ -238,12 +238,14 @@ async function submitTest() {
         // Both 200 (existing result) and 201 (new result) are success
         if (response.ok) {
             const result = await response.json();
-            alert(`Test muvaffaqiyatli topshirildi!\n\nNatijalaringizni Telegram botdan tekshiring!`);
 
             // Disable further interaction
             document.getElementById('submit-btn').disabled = true;
             document.querySelectorAll('.option-btn').forEach(btn => btn.disabled = true);
             document.querySelectorAll('.math-input').forEach(mf => mf.disabled = true);
+
+            // Show results on page
+            showResults(result);
         } else {
             let errorMessage = 'Topshirishda xatolik';
             try {
@@ -274,6 +276,89 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
 
 // Initialize on page load
 window.addEventListener('DOMContentLoaded', loadSession);
+
+// Show results after submission
+function showResults(result) {
+    const container = document.querySelector('.container');
+
+    // Build MCQ results grid (5 per row)
+    const mcqAnswers = result.mcq_answers || [];
+    let mcqRows = '';
+    for (let i = 0; i < mcqAnswers.length; i += 5) {
+        const chunk = mcqAnswers.slice(i, i + 5);
+        const items = chunk.map(a => {
+            const icon = a.is_correct ? '✅' : '❌';
+            const cls = a.is_correct ? 'result-correct' : 'result-wrong';
+            return `<span class="result-item ${cls}">${a.question_number}-${icon}</span>`;
+        }).join('');
+        mcqRows += `<div class="result-row">${items}</div>`;
+    }
+
+    // Build written results
+    const writtenAnswers = result.written_answers || [];
+    let writtenHTML = '';
+    if (writtenAnswers.length > 0) {
+        writtenHTML = writtenAnswers.map(wa => {
+            const score = wa.score || 0;
+            let detail;
+            if (score === 2) {
+                detail = 'a) ✅  b) ✅';
+            } else if (score === 1) {
+                detail = '1/2 to\'g\'ri ⚠️';
+            } else {
+                detail = 'a) ❌  b) ❌';
+            }
+            return `<div class="result-written-item">${wa.question_number}-savol: ${detail}</div>`;
+        }).join('');
+    }
+
+    const mcqScore = result.mcq_score || 0;
+    const writtenScore = result.written_score || 0;
+    const totalScore = result.total_score || 0;
+
+    container.innerHTML = `
+        <div class="results-page">
+            <div class="results-header">
+                <div class="results-check">✅</div>
+                <h1>Test muvaffaqiyatli topshirildi!</h1>
+            </div>
+
+            <div class="results-section">
+                <h2>📝 Test savollari (1-35)</h2>
+                <div class="results-mcq-grid">
+                    ${mcqRows}
+                </div>
+            </div>
+
+            ${writtenAnswers.length > 0 ? `
+            <div class="results-section">
+                <h2>✍️ Yozma savollar (36-45)</h2>
+                <div class="results-written-grid">
+                    ${writtenHTML}
+                </div>
+            </div>
+            ` : ''}
+
+            <div class="results-summary">
+                <h2>📈 Umumiy natija</h2>
+                <div class="results-scores">
+                    <div class="score-item">
+                        <div class="score-label">📝 Test</div>
+                        <div class="score-value">${mcqScore}/35</div>
+                    </div>
+                    <div class="score-item">
+                        <div class="score-label">✍️ Yozma</div>
+                        <div class="score-value">${writtenScore}/20</div>
+                    </div>
+                    <div class="score-item score-total">
+                        <div class="score-label">⭐ Jami</div>
+                        <div class="score-value">${totalScore}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
 
 // Prevent accidental page close
 window.addEventListener('beforeunload', (e) => {

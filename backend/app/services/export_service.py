@@ -56,8 +56,8 @@ async def export_results_to_excel(db: AsyncSession, test_id: UUID, filepath: str
     ws = wb.active
     ws.title = "Test Results"
     
-    # Headers: Name, Surname, Region, Correct, Q1-Q35, Q36a, Q36b, Q37a, Q37b
-    headers = ["Name", "Surname", "Region", "Correct"]
+    # Headers: Talaba, Correct, Q1-Q35, Q36a, Q36b, Q37a, Q37b
+    headers = ["Talaba", "Correct"]
     for i in range(1, 36):
         headers.append(f"Q{i}")
     for i in range(36, 46):
@@ -99,10 +99,9 @@ async def export_results_to_excel(db: AsyncSession, test_id: UUID, filepath: str
         written_result = await db.execute(stmt)
         written_answers = written_result.scalars().all()
         
+        student_info = f"{user.full_name} {user.surname} - {user.region}"
         row_data = [
-            user.full_name,
-            user.surname,
-            user.region,
+            student_info,
             result_record.total_score
         ]
         
@@ -144,11 +143,11 @@ async def export_results_to_excel(db: AsyncSession, test_id: UUID, filepath: str
         row_num = ws.max_row + 1
         ws.append(row_data)
         
-        # Color code all answer cells (columns 5 onwards = Q1 starts at col 5)
-        for col_offset in range(len(row_data) - 4):
-            col_num = 5 + col_offset
+        # Color code all answer cells (columns 3 onwards = Q1 starts at col 3)
+        for col_offset in range(len(row_data) - 2):
+            col_num = 3 + col_offset
             cell = ws.cell(row=row_num, column=col_num)
-            value = row_data[4 + col_offset]
+            value = row_data[2 + col_offset]
             
             if value == 1:
                 cell.fill = green_fill
@@ -164,11 +163,9 @@ async def export_results_to_excel(db: AsyncSession, test_id: UUID, filepath: str
         column_letter = get_column_letter(col_num)
         ws.column_dimensions[column_letter].width = 10
     
-    # Wider columns for Name, Surname, Region
-    ws.column_dimensions['A'].width = 15
-    ws.column_dimensions['B'].width = 15
-    ws.column_dimensions['C'].width = 15
-    ws.column_dimensions['D'].width = 10
+    # Wider column for Talaba
+    ws.column_dimensions['A'].width = 35
+    ws.column_dimensions['B'].width = 10
     
     # Save
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
@@ -251,8 +248,8 @@ async def export_results_to_pdf(db: AsyncSession, test_id: UUID, filepath: str) 
     elements.append(summary)
     elements.append(Spacer(1, 0.3 * inch))
     
-    # Headers: Name, Surname, Region, Correct, Q1-Q35, Q36a, Q36b, Q37a, Q37b
-    headers = ["Name", "Surname", "Region", "Bal"]
+    # Headers: Talaba, Bal, Q1-Q35, Q36a, Q36b, Q37a, Q37b
+    headers = ["Talaba", "Bal"]
     for i in range(1, 36):
         headers.append(f"Q{i}")
     for i in range(36, 46):
@@ -280,10 +277,9 @@ async def export_results_to_pdf(db: AsyncSession, test_id: UUID, filepath: str) 
         written_result = await db.execute(stmt)
         written_answers = written_result.scalars().all()
         
+        student_info = f"{user.full_name or ''} {user.surname or ''} - {user.region or ''}"
         row = [
-            user.full_name or "",
-            user.surname or "",
-            user.region or "",
+            student_info,
             str(result_record.total_score)
         ]
         
@@ -329,12 +325,12 @@ async def export_results_to_pdf(db: AsyncSession, test_id: UUID, filepath: str) 
         cell_values.append(row_values)
     
     # Calculate column widths
-    # Name/Surname/Region get more space, question columns are narrow
-    name_width = 0.9 * inch
+    # Talaba column gets more space, question columns are narrow
+    talaba_width = 2.2 * inch
     q_width = 0.28 * inch
     bal_width = 0.35 * inch
     
-    col_widths = [name_width, name_width, name_width, bal_width]
+    col_widths = [talaba_width, bal_width]
     col_widths.extend([q_width] * 55)  # Q1-Q35 + Q36a..Q45b
     
     results_table = Table(table_data, colWidths=col_widths)
@@ -354,8 +350,8 @@ async def export_results_to_pdf(db: AsyncSession, test_id: UUID, filepath: str) 
         ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
         ('LEFTPADDING', (0, 0), (-1, -1), 2),
         ('RIGHTPADDING', (0, 0), (-1, -1), 2),
-        # Left-align name columns
-        ('ALIGN', (0, 1), (2, -1), 'LEFT'),
+        # Left-align Talaba column
+        ('ALIGN', (0, 1), (0, -1), 'LEFT'),
     ]
     
     # Color code answer cells (col 4 onwards = Q1, row 1 onwards = data)
@@ -365,7 +361,7 @@ async def export_results_to_pdf(db: AsyncSession, test_id: UUID, filepath: str) 
     for row_idx, row_vals in enumerate(cell_values):
         data_row = row_idx + 1  # +1 for header
         for col_idx, val in enumerate(row_vals):
-            data_col = col_idx + 4  # +4 for Name, Surname, Region, Bal
+            data_col = col_idx + 2  # +2 for Talaba, Bal
             if val == 1:
                 style_commands.append(('BACKGROUND', (data_col, data_row), (data_col, data_row), green_bg))
                 style_commands.append(('TEXTCOLOR', (data_col, data_row), (data_col, data_row), colors.HexColor('#006100')))
