@@ -82,20 +82,8 @@ async def grade_and_save_result(
         # Correct answer from answer key like {"a": "correct_a", "b": "correct_b"}
         correct_ans = written_answers_data.get(str(written_answer.question_number), {})
         
-        # Compare each sub-part (a, b) - score 1 for each correct sub-part
-        # Normalize: strip, lower, collapse whitespace, and simplify LaTeX for flexible matching
-        import re
-        def normalize(s):
-            if not s:
-                return ''
-            s = str(s).strip().lower()
-            # Remove extra whitespace
-            s = re.sub(r'\s+', ' ', s)
-            # Normalize common LaTeX variations
-            s = s.replace('\\left(', '(').replace('\\right)', ')')
-            s = s.replace('\\left[', '[').replace('\\right]', ']')
-            s = s.replace('\\cdot', '*').replace('\\times', '*')
-            return s
+        # Compare each sub-part (a, b) using shared comparison utility
+        from app.utils.answer_compare import normalize, answers_match
         
         score = 0
         student_a = normalize(student_ans.get('a', ''))
@@ -103,10 +91,10 @@ async def grade_and_save_result(
         correct_a = normalize(correct_ans.get('a', ''))
         correct_b = normalize(correct_ans.get('b', ''))
         
-        if student_a and correct_a and (student_a == correct_a or correct_a in student_a):
+        if answers_match(student_a, correct_a):
             score += 1
             written_correct_count += 1
-        if student_b and correct_b and (student_b == correct_b or correct_b in student_b):
+        if answers_match(student_b, correct_b):
             score += 1
             written_correct_count += 1
         

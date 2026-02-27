@@ -17,16 +17,7 @@ from app.models.result import Result, MCQAnswer, WrittenAnswer
 from app.models.test import Test, AnswerKey
 
 
-def _normalize(s):
-    """Normalize answer string for comparison."""
-    if not s:
-        return ''
-    s = str(s).strip().lower()
-    s = re.sub(r'\s+', ' ', s)
-    s = s.replace('\\left(', '(').replace('\\right)', ')')
-    s = s.replace('\\left[', '[').replace('\\right]', ']')
-    s = s.replace('\\cdot', '*').replace('\\times', '*')
-    return s
+from app.utils.answer_compare import normalize as _normalize, answers_match as _answers_match
 
 
 async def _build_written_responses(db, written_answers_list, test_id):
@@ -49,14 +40,14 @@ async def _build_written_responses(db, written_answers_list, test_id):
             except (ValueError, TypeError):
                 student = {}
         
-        # Compare sub-parts
+        # Compare sub-parts using shared utility
         s_a = _normalize(student.get('a', ''))
         c_a = _normalize(correct_ans.get('a', ''))
-        sa_correct = 1 if (s_a and c_a and (s_a == c_a or c_a in s_a)) else 0
+        sa_correct = 1 if _answers_match(s_a, c_a) else 0
         
         s_b = _normalize(student.get('b', ''))
         c_b = _normalize(correct_ans.get('b', ''))
-        sb_correct = 1 if (s_b and c_b and (s_b == c_b or c_b in s_b)) else 0
+        sb_correct = 1 if _answers_match(s_b, c_b) else 0
         
         responses.append(WrittenAnswerResponse(
             id=a.id,

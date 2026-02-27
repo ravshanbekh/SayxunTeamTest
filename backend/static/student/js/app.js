@@ -8,6 +8,67 @@ let timer = null;
 let mcqAnswers = {};
 let writtenAnswers = {};
 
+// Customize MathLive virtual keyboard — add degree symbol
+document.addEventListener('DOMContentLoaded', () => {
+    if (window.mathVirtualKeyboard) {
+        const kb = window.mathVirtualKeyboard;
+        // Add a degree (°) button to the numeric keyboard
+        kb.layouts = [
+            'numeric',
+            'symbols',
+            'alphabetic',
+            'greek',
+            {
+                label: '°∠',
+                tooltip: 'Burchak belgilari',
+                rows: [
+                    [
+                        { latex: '\\degree', label: '°', tooltip: 'Gradus' },
+                        { latex: '\\angle', label: '∠' },
+                        { latex: '\\triangle', label: '△' },
+                        { latex: '\\perp', label: '⊥' },
+                        { latex: '\\parallel', label: '∥' },
+                        { label: '7', insert: '7' },
+                        { label: '8', insert: '8' },
+                        { label: '9', insert: '9' },
+                        { latex: '\\div' },
+                    ],
+                    [
+                        { latex: '\\sin', label: 'sin' },
+                        { latex: '\\cos', label: 'cos' },
+                        { latex: '\\tan', label: 'tan' },
+                        { latex: '\\pi' },
+                        { latex: '\\sqrt{#0}', label: '√' },
+                        { label: '4', insert: '4' },
+                        { label: '5', insert: '5' },
+                        { label: '6', insert: '6' },
+                        { latex: '\\times' },
+                    ],
+                    [
+                        { label: '(', insert: '(' },
+                        { label: ')', insert: ')' },
+                        { latex: '\\frac{#0}{#1}', label: 'a/b' },
+                        { latex: '^{#0}', label: 'xⁿ' },
+                        { latex: '_{#0}', label: 'x₊' },
+                        { label: '1', insert: '1' },
+                        { label: '2', insert: '2' },
+                        { label: '3', insert: '3' },
+                        { label: '−', insert: '-' },
+                    ],
+                    [
+                        '[separator-5]',
+                        { label: '0', insert: '0' },
+                        { label: '.', insert: '.' },
+                        { label: '=', insert: '=' },
+                        { label: '+', insert: '+' },
+                        '[left]', '[right]', '[return]', '[backspace]',
+                    ],
+                ],
+            },
+        ];
+    }
+});
+
 // Get session token from URL
 function getSessionToken() {
     const params = new URLSearchParams(window.location.search);

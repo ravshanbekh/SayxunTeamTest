@@ -24,6 +24,7 @@ from app.models.result import Result, MCQAnswer, WrittenAnswer
 from app.models.user import User
 from app.models.test import Test, AnswerKey
 from app.config import settings
+from app.utils.answer_compare import normalize as _norm, answers_match as _match
 
 logger = logging.getLogger(__name__)
 
@@ -115,13 +116,13 @@ def _build_row_data(user, result_record, mcq_answers, written_answers, written_a
             except (ValueError, TypeError):
                 student = {}
             
-            s_a = str(student.get('a', '')).strip().lower() if student.get('a') else ''
-            c_a = str(correct_ans.get('a', '')).strip().lower() if correct_ans.get('a') else ''
-            written_values.append(1 if (s_a and c_a and s_a == c_a) else 0)
+            s_a = _norm(str(student.get('a', '')))
+            c_a = _norm(str(correct_ans.get('a', '')))
+            written_values.append(1 if _match(s_a, c_a) else 0)
             
-            s_b = str(student.get('b', '')).strip().lower() if student.get('b') else ''
-            c_b = str(correct_ans.get('b', '')).strip().lower() if correct_ans.get('b') else ''
-            written_values.append(1 if (s_b and c_b and s_b == c_b) else 0)
+            s_b = _norm(str(student.get('b', '')))
+            c_b = _norm(str(correct_ans.get('b', '')))
+            written_values.append(1 if _match(s_b, c_b) else 0)
         else:
             written_values.append(0)  # Q_a
             written_values.append(0)  # Q_b
