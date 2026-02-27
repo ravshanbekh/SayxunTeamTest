@@ -5,24 +5,32 @@ Handles normalization, degree/radian equivalence, and LaTeX variations.
 import re
 
 
-# Degree-radian equivalence table
+# Degree-radian equivalence table (every 15° = π/12)
 DEGREE_TO_RADIAN = {
     '0': '0',
+    '15': '\\frac{\\pi}{12}',
     '30': '\\frac{\\pi}{6}',
     '45': '\\frac{\\pi}{4}',
     '60': '\\frac{\\pi}{3}',
+    '75': '\\frac{5\\pi}{12}',
     '90': '\\frac{\\pi}{2}',
+    '105': '\\frac{7\\pi}{12}',
     '120': '\\frac{2\\pi}{3}',
     '135': '\\frac{3\\pi}{4}',
     '150': '\\frac{5\\pi}{6}',
+    '165': '\\frac{11\\pi}{12}',
     '180': '\\pi',
+    '195': '\\frac{13\\pi}{12}',
     '210': '\\frac{7\\pi}{6}',
     '225': '\\frac{5\\pi}{4}',
     '240': '\\frac{4\\pi}{3}',
+    '255': '\\frac{17\\pi}{12}',
     '270': '\\frac{3\\pi}{2}',
+    '285': '\\frac{19\\pi}{12}',
     '300': '\\frac{5\\pi}{3}',
     '315': '\\frac{7\\pi}{4}',
     '330': '\\frac{11\\pi}{6}',
+    '345': '\\frac{23\\pi}{12}',
     '360': '2\\pi',
 }
 
