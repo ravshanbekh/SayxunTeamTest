@@ -31,9 +31,8 @@
             <div class="logo">📚 Test Platformasi</div>
             <ul class="menu">
                 <li><a href="#" data-page="dashboard" class="active">Bosh sahifa</a></li>
-                <li><a href="#" data-page="tests">Testlarni boshqarish</a></li>
-
-                <li><a href="#" data-page="students">Talabalar</a></li>
+                <li><a href="#" data-page="tests">Sertifikat testlari</a></li>
+                <li><a href="#" data-page="prezident">Prezident maktabi testlari</a></li>
                 <li><a href="#" data-page="admins">Adminlar</a></li>
                 <li><a href="#" id="logout-btn">Chiqish</a></li>
             </ul>
@@ -47,19 +46,18 @@
                 <div class="recent-tests" id="recent-tests"></div>
             </div>
 
-            <!-- Manage Tests -->
+            <!-- Sertifikat Tests -->
             <div class="page" id="tests-page">
-                <h1>Testlarni boshqarish</h1>
+                <h1>Sertifikat testlari</h1>
                 <button class="btn-primary" id="create-test-btn">+ Yangi test yaratish</button>
                 <div class="tests-list" id="tests-list"></div>
             </div>
 
-
-
-            <!-- Students -->
-            <div class="page" id="students-page">
-                <h1>Talabalar</h1>
-                <div class="students-list" id="students-list"></div>
+            <!-- Prezident Maktabi Tests -->
+            <div class="page" id="prezident-page">
+                <h1>Prezident maktabi testlari</h1>
+                <button class="btn-primary" id="create-prezident-btn">+ Yangi test yaratish</button>
+                <div class="tests-list" id="prezident-list"></div>
             </div>
 
             <!-- Admins -->
@@ -71,10 +69,10 @@
         </main>
     </div>
 
-    <!-- Create Test Modal -->
+    <!-- Create Sertifikat Test Modal -->
     <div class="modal hidden" id="create-test-modal">
         <div class="modal-content">
-            <h2>Yangi test yaratish</h2>
+            <h2>Yangi sertifikat test yaratish</h2>
             <form id="create-test-form">
                 <div class="form-group">
                     <label>Test kodi</label>
@@ -106,10 +104,10 @@
         </div>
     </div>
 
-    <!-- Edit Test Modal -->
+    <!-- Edit Sertifikat Test Modal -->
     <div class="modal hidden" id="edit-test-modal">
         <div class="modal-content">
-            <h2>✏️ Test Tahrirlash</h2>
+            <h2>✏️ Sertifikat test tahrirlash</h2>
             <form id="edit-test-form">
                 <div class="form-group">
                     <label>Test kodi</label>
@@ -147,6 +145,82 @@
         </div>
     </div>
 
+    <!-- Create Prezident Test Modal -->
+    <div class="modal hidden" id="create-prezident-modal">
+        <div class="modal-content">
+            <h2>Yangi Prezident maktabi test yaratish</h2>
+            <form id="create-prezident-form">
+                <div class="form-group">
+                    <label>Test kodi</label>
+                    <input type="text" id="prez-test-code" required>
+                </div>
+                <div class="form-group">
+                    <label>Test nomi</label>
+                    <input type="text" id="prez-test-title" required>
+                </div>
+                <div class="form-group">
+                    <label>Tavsif</label>
+                    <textarea id="prez-test-desc"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Boshlanish vaqti</label>
+                    <input type="datetime-local" id="prez-test-start-time">
+                </div>
+                <div class="form-group">
+                    <label>Tugash vaqti</label>
+                    <input type="datetime-local" id="prez-test-end-time">
+                </div>
+                <h3>Test javoblari (1-40)</h3>
+                <div id="prez-mcq-answers-grid"></div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" id="cancel-create-prez">Bekor qilish</button>
+                    <button type="submit" class="btn-primary">Test yaratish</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Prezident Test Modal -->
+    <div class="modal hidden" id="edit-prezident-modal">
+        <div class="modal-content">
+            <h2>✏️ Prezident maktabi test tahrirlash</h2>
+            <form id="edit-prezident-form">
+                <div class="form-group">
+                    <label>Test kodi</label>
+                    <input type="text" id="edit-prez-test-code" required>
+                </div>
+                <div class="form-group">
+                    <label>Test nomi</label>
+                    <input type="text" id="edit-prez-test-title" required>
+                </div>
+                <div class="form-group">
+                    <label>Tavsif</label>
+                    <textarea id="edit-prez-test-desc"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="edit-prez-test-active">
+                        Faol
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label>Boshlanish vaqti</label>
+                    <input type="datetime-local" id="edit-prez-test-start-time">
+                </div>
+                <div class="form-group">
+                    <label>Tugash vaqti</label>
+                    <input type="datetime-local" id="edit-prez-test-end-time">
+                </div>
+                <h3>Test javoblari (1-40)</h3>
+                <div id="edit-prez-mcq-answers-grid"></div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" id="cancel-edit-prez">Bekor qilish</button>
+                    <button type="submit" class="btn-primary">💾 Saqlash</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Add Admin Modal -->
     <div class="modal hidden" id="add-admin-modal">
         <div class="modal-content" style="max-width: 400px;">
@@ -170,7 +244,7 @@
 
     <script src="https://unpkg.com/mathlive"></script>
     <script src="js/auth.js"></script>
-    <script src="js/dashboard.js"></script>
+    <script src="js/dashboard.js?v=2"></script>
 </body>
 
 </html>

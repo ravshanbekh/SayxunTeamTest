@@ -39,7 +39,8 @@ async def create_test(
         created_by_admin=admin_id,
         is_active=True,
         start_time=test_data.start_time,
-        end_time=test_data.end_time
+        end_time=test_data.end_time,
+        test_type=test_data.test_type
     )
     
     db.add(test)
@@ -91,19 +92,14 @@ async def get_test_by_id(db: AsyncSession, test_id: UUID) -> Optional[Test]:
     return result.scalars().first()
 
 
-async def get_all_tests(db: AsyncSession, skip: int = 0, limit: int = 100) -> List[Test]:
+async def get_all_tests(db: AsyncSession, skip: int = 0, limit: int = 100, test_type: str | None = None) -> List[Test]:
     """
-    Get all tests with pagination.
-    
-    Args:
-        db: Database session
-        skip: Number of records to skip
-        limit: Maximum number of records to return
-    
-    Returns:
-        List of Test instances
+    Get all tests with pagination, optionally filtered by test_type.
     """
-    stmt = select(Test).offset(skip).limit(limit).order_by(Test.created_at.desc())
+    stmt = select(Test)
+    if test_type:
+        stmt = stmt.where(Test.test_type == test_type)
+    stmt = stmt.offset(skip).limit(limit).order_by(Test.created_at.desc())
     result = await db.execute(stmt)
     return result.scalars().all()
 

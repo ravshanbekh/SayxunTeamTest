@@ -92,40 +92,42 @@ async def _load_export_data(db: AsyncSession, test_id: UUID):
     return test, results, users_dict, mcq_by_result, written_by_result, written_answers_key
 
 
-def _build_row_data(user, result_record, mcq_answers, written_answers, written_answers_key):
+def _build_row_data(user, result_record, mcq_answers, written_answers, written_answers_key, test_type='sertifikat'):
     """Build a single row of data for export (shared between Excel and PDF)."""
     student_info = f"{user.full_name or ''} {user.surname or ''} - {user.region or ''}"
     
-    # MCQ answers as 0/1 (Q1-Q35)
+    # MCQ answers as 0/1
     mcq_dict = {ans.question_number: ans for ans in mcq_answers}
+    total_mcq = 40 if test_type == 'prezident' else 35
     mcq_values = []
-    for q_num in range(1, 36):
+    for q_num in range(1, total_mcq + 1):
         ans = mcq_dict.get(q_num)
         mcq_values.append(1 if (ans and ans.is_correct) else 0)
     
-    # Written answers as 0/1 per sub-part (Q36a, Q36b, ... Q45a, Q45b)
-    written_dict = {ans.question_number: ans for ans in written_answers}
+    # Written answers as 0/1 per sub-part (only for sertifikat)
     written_values = []
-    for q_num in range(36, 46):
-        written_ans = written_dict.get(q_num)
-        correct_ans = written_answers_key.get(str(q_num), {})
-        
-        if written_ans and written_ans.student_answer:
-            try:
-                student = _json.loads(written_ans.student_answer)
-            except (ValueError, TypeError):
-                student = {}
+    if test_type != 'prezident':
+        written_dict = {ans.question_number: ans for ans in written_answers}
+        for q_num in range(36, 46):
+            written_ans = written_dict.get(q_num)
+            correct_ans = written_answers_key.get(str(q_num), {})
             
-            s_a = _norm(str(student.get('a', '')))
-            c_a = _norm(str(correct_ans.get('a', '')))
-            written_values.append(1 if _match(s_a, c_a) else 0)
-            
-            s_b = _norm(str(student.get('b', '')))
-            c_b = _norm(str(correct_ans.get('b', '')))
-            written_values.append(1 if _match(s_b, c_b) else 0)
-        else:
-            written_values.append(0)  # Q_a
-            written_values.append(0)  # Q_b
+            if written_ans and written_ans.student_answer:
+                try:
+                    student = _json.loads(written_ans.student_answer)
+                except (ValueError, TypeError):
+                    student = {}
+                
+                s_a = _norm(str(student.get('a', '')))
+                c_a = _norm(str(correct_ans.get('a', '')))
+                written_values.append(1 if _match(s_a, c_a) else 0)
+                
+                s_b = _norm(str(student.get('b', '')))
+                c_b = _norm(str(correct_ans.get('b', '')))
+                written_values.append(1 if _match(s_b, c_b) else 0)
+            else:
+                written_values.append(0)  # Q_a
+                written_values.append(0)  # Q_b
     
     return student_info, result_record.total_score, mcq_values, written_values
 
@@ -146,12 +148,17 @@ async def export_results_to_excel(db: AsyncSession, test_id: UUID, filepath: str
     ws = wb.active
     ws.title = "Test Results"
     
+    # Determine test type
+    test_type = getattr(test, 'test_type', None) or 'sertifikat'
+    total_mcq = 40 if test_type == 'prezident' else 35
+    
     # Headers
     headers = ["Talaba", "Correct"]
-    for i in range(1, 36):
+    for i in range(1, total_mcq + 1):
         headers.append(f"Q{i}")
-    for i in range(36, 46):
-        headers.extend([f"Q{i}a", f"Q{i}b"])
+    if test_type != 'prezident':
+        for i in range(36, 46):
+            headers.extend([f"Q{i}a", f"Q{i}b"])
     
     ws.append(headers)
     
@@ -176,7 +183,7 @@ async def export_results_to_excel(db: AsyncSession, test_id: UUID, filepath: str
         written_answers = written_by_result.get(result_record.id, [])
         
         student_info, total_score, mcq_values, written_values = \
-            _build_row_data(user, result_record, mcq_answers, written_answers, written_answers_key)
+            _build_row_data(user, result_record, mcq_answers, written_answers, written_answers_key, test_type)
         
         row_data = [student_info, total_score] + mcq_values + written_values
         ws.append(row_data)
@@ -258,12 +265,17 @@ async def export_results_to_pdf(db: AsyncSession, test_id: UUID, filepath: str) 
     elements.append(summary)
     elements.append(Spacer(1, 0.3 * inch))
     
+    # Determine test type
+    test_type = getattr(test, 'test_type', None) or 'sertifikat'
+    total_mcq = 40 if test_type == 'prezident' else 35
+    
     # Headers
     headers = ["Talaba", "Bal"]
-    for i in range(1, 36):
+    for i in range(1, total_mcq + 1):
         headers.append(f"Q{i}")
-    for i in range(36, 46):
-        headers.extend([f"{i}a", f"{i}b"])
+    if test_type != 'prezident':
+        for i in range(36, 46):
+            headers.extend([f"{i}a", f"{i}b"])
     
     table_data = [headers]
     
@@ -278,7 +290,7 @@ async def export_results_to_pdf(db: AsyncSession, test_id: UUID, filepath: str) 
         written_answers = written_by_result.get(result_record.id, [])
         
         student_info, total_score, mcq_values, written_values = \
-            _build_row_data(user, result_record, mcq_answers, written_answers, written_answers_key)
+            _build_row_data(user, result_record, mcq_answers, written_answers, written_answers_key, test_type)
         
         row = [student_info, str(total_score)]
         row.extend(str(v) for v in mcq_values)
@@ -294,8 +306,9 @@ async def export_results_to_pdf(db: AsyncSession, test_id: UUID, filepath: str) 
     q_width = 0.28 * inch
     bal_width = 0.35 * inch
     
+    num_q_cols = total_mcq + (20 if test_type != 'prezident' else 0)
     col_widths = [talaba_width, bal_width]
-    col_widths.extend([q_width] * 55)
+    col_widths.extend([q_width] * num_q_cols)
     
     results_table = Table(table_data, colWidths=col_widths)
     

@@ -1,81 +1,53 @@
-/**
- * Main application logic for test taking
- */
+// MathLive virtual keyboard customization: add degree and angle symbols
+document.addEventListener('DOMContentLoaded', () => {
+    if (window.mathVirtualKeyboard) {
+        const defaultLayouts = window.mathVirtualKeyboard.layouts || ['numeric', 'symbols', 'alphabetic'];
+        window.mathVirtualKeyboard.layouts = [
+            ...defaultLayouts,
+            {
+                label: '°∠',
+                rows: [
+                    [
+                        { label: '°', insert: '°' },
+                        { label: '∠', insert: '\\angle ' },
+                        { label: '△', insert: '\\triangle ' },
+                        { label: '⊥', insert: '\\perp ' },
+                        { label: '∥', insert: '\\parallel ' },
+                    ],
+                    [
+                        { label: 'sin', insert: '\\sin\\left(#0\\right)' },
+                        { label: 'cos', insert: '\\cos\\left(#0\\right)' },
+                        { label: 'tan', insert: '\\tan\\left(#0\\right)' },
+                        { label: 'π', insert: '\\pi' },
+                        { label: '√', insert: '\\sqrt{#0}' },
+                    ],
+                    [
+                        { label: 'x²', insert: '#0^{2}' },
+                        { label: 'xⁿ', insert: '#0^{#0}' },
+                        { label: '÷', insert: '\\frac{#0}{#0}' },
+                        { label: '±', insert: '\\pm ' },
+                        { label: '≈', insert: '\\approx ' },
+                    ]
+                ]
+            }
+        ];
+    }
+});
 
 const API_BASE = window.location.origin;
 let sessionToken = null;
 let timer = null;
 let mcqAnswers = {};
 let writtenAnswers = {};
+let currentTestType = 'sertifikat'; // Will be set from session
 
-// Customize MathLive virtual keyboard — add degree symbol
-document.addEventListener('DOMContentLoaded', () => {
-    if (window.mathVirtualKeyboard) {
-        const kb = window.mathVirtualKeyboard;
-        // Add a degree (°) button to the numeric keyboard
-        kb.layouts = [
-            'numeric',
-            'symbols',
-            'alphabetic',
-            'greek',
-            {
-                label: '°∠',
-                tooltip: 'Burchak belgilari',
-                rows: [
-                    [
-                        { latex: '\\degree', label: '°', tooltip: 'Gradus' },
-                        { latex: '\\angle', label: '∠' },
-                        { latex: '\\triangle', label: '△' },
-                        { latex: '\\perp', label: '⊥' },
-                        { latex: '\\parallel', label: '∥' },
-                        { label: '7', insert: '7' },
-                        { label: '8', insert: '8' },
-                        { label: '9', insert: '9' },
-                        { latex: '\\div' },
-                    ],
-                    [
-                        { latex: '\\sin', label: 'sin' },
-                        { latex: '\\cos', label: 'cos' },
-                        { latex: '\\tan', label: 'tan' },
-                        { latex: '\\pi' },
-                        { latex: '\\sqrt{#0}', label: '√' },
-                        { label: '4', insert: '4' },
-                        { label: '5', insert: '5' },
-                        { label: '6', insert: '6' },
-                        { latex: '\\times' },
-                    ],
-                    [
-                        { label: '(', insert: '(' },
-                        { label: ')', insert: ')' },
-                        { latex: '\\frac{#0}{#1}', label: 'a/b' },
-                        { latex: '^{#0}', label: 'xⁿ' },
-                        { latex: '_{#0}', label: 'x₊' },
-                        { label: '1', insert: '1' },
-                        { label: '2', insert: '2' },
-                        { label: '3', insert: '3' },
-                        { label: '−', insert: '-' },
-                    ],
-                    [
-                        '[separator-5]',
-                        { label: '0', insert: '0' },
-                        { label: '.', insert: '.' },
-                        { label: '=', insert: '=' },
-                        { label: '+', insert: '+' },
-                        '[left]', '[right]', '[return]', '[backspace]',
-                    ],
-                ],
-            },
-        ];
-    }
-});
-
-// Get session token from URL
+// Get session token from URL query parameters
 function getSessionToken() {
-    const params = new URLSearchParams(window.location.search);
-    return params.get('token');
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('token');
 }
 
-// Show/hide loading
+// Show/hide loading overlay
 function setLoading(isLoading) {
     const loading = document.getElementById('loading');
     if (isLoading) {
@@ -97,7 +69,6 @@ async function loadSession() {
     try {
         setLoading(true);
 
-        // Get session details
         const response = await fetch(`${API_BASE}/api/v1/sessions/${sessionToken}`);
 
         if (!response.ok) {
@@ -106,7 +77,6 @@ async function loadSession() {
 
         const session = await response.json();
 
-        // Check if session is valid
         if (!session.is_valid) {
             setLoading(false);
             if (session.is_submitted) {
@@ -119,12 +89,22 @@ async function loadSession() {
             return;
         }
 
-        // Get test details from session (session already has test info)
+        // Get test type from session
+        currentTestType = session.test_type || 'sertifikat';
+
         document.getElementById('test-title').textContent = session.test_title || 'Test';
 
-        // Initialize UI
+        // Initialize UI based on test type
         createMCQGrid();
-        createWrittenFields();
+        if (currentTestType === 'sertifikat') {
+            createWrittenFields();
+        } else {
+            // Hide written section for prezident tests
+            const writtenContainer = document.getElementById('written-container');
+            if (writtenContainer) writtenContainer.innerHTML = '';
+            const writtenHeader = document.querySelector('.written-section h2');
+            if (writtenHeader) writtenHeader.style.display = 'none';
+        }
 
         // Start timer
         timer = new window.Timer(
@@ -147,13 +127,20 @@ function createMCQGrid() {
     const container = document.getElementById('mcq-container');
     container.innerHTML = '';
 
-    for (let i = 1; i <= 35; i++) {
+    const totalMCQ = currentTestType === 'prezident' ? 40 : 35;
+
+    for (let i = 1; i <= totalMCQ; i++) {
         const item = document.createElement('div');
         item.className = 'mcq-item';
 
-        // Questions 1-32: 4 options (A, B, C, D)
-        // Questions 33-35: 6 options (A, B, C, D, E, F)
-        const options = i <= 32 ? ['A', 'B', 'C', 'D'] : ['A', 'B', 'C', 'D', 'E', 'F'];
+        // Sertifikat: Q1-32 = A-D, Q33-35 = A-F
+        // Prezident: Q1-40 = A-D
+        let options;
+        if (currentTestType === 'prezident') {
+            options = ['A', 'B', 'C', 'D'];
+        } else {
+            options = i <= 32 ? ['A', 'B', 'C', 'D'] : ['A', 'B', 'C', 'D', 'E', 'F'];
+        }
 
         const optionsHTML = options.map(opt =>
             `<button class="option-btn" data-question="${i}" data-option="${opt}">${opt}</button>`
@@ -174,14 +161,10 @@ function createMCQGrid() {
             const question = e.target.dataset.question;
             const option = e.target.dataset.option;
 
-            // Remove selected class from all options for this question
             const buttons = container.querySelectorAll(`[data-question="${question}"]`);
             buttons.forEach(btn => btn.classList.remove('selected'));
 
-            // Add selected class to clicked option
             e.target.classList.add('selected');
-
-            // Store answer
             mcqAnswers[question] = option;
         }
     });
@@ -192,7 +175,6 @@ function createWrittenFields() {
     const container = document.getElementById('written-container');
     container.innerHTML = '';
 
-    // Questions 36-45: Each has a) and b) sub-parts
     for (let i = 36; i <= 45; i++) {
         const item = document.createElement('div');
         item.className = 'written-item';
@@ -225,15 +207,14 @@ function createWrittenFields() {
             writtenAnswers[i] = { a: '', b: '' };
         }
 
-        // Add input handlers for math-field elements
         const mfA = item.querySelector(`#written-${i}-a`);
         const mfB = item.querySelector(`#written-${i}-b`);
 
         mfA.addEventListener('input', () => {
-            writtenAnswers[i].a = mfA.value; // LaTeX string
+            writtenAnswers[i].a = mfA.value;
         });
         mfB.addEventListener('input', () => {
-            writtenAnswers[i].b = mfB.value; // LaTeX string
+            writtenAnswers[i].b = mfB.value;
         });
     }
 }
@@ -254,29 +235,33 @@ async function handleTimeExpire() {
 let isSubmitting = false;
 
 async function submitTest() {
-    if (isSubmitting) return; // Prevent double submit
+    if (isSubmitting) return;
     isSubmitting = true;
 
     if (timer) {
         timer.stop();
     }
 
-    // Prepare MCQ answers (1-35)
+    const totalMCQ = currentTestType === 'prezident' ? 40 : 35;
+
+    // Prepare MCQ answers
     const mcqArray = [];
-    for (let i = 1; i <= 35; i++) {
+    for (let i = 1; i <= totalMCQ; i++) {
         mcqArray.push({
             question_number: i,
             answer: mcqAnswers[i] || null
         });
     }
 
-    // Prepare written answers (36-45 with a/b sub-parts)
+    // Prepare written answers (only for sertifikat)
     const writtenArray = [];
-    for (let i = 36; i <= 45; i++) {
-        writtenArray.push({
-            question_number: i,
-            answer: writtenAnswers[i] || { a: null, b: null }
-        });
+    if (currentTestType === 'sertifikat') {
+        for (let i = 36; i <= 45; i++) {
+            writtenArray.push({
+                question_number: i,
+                answer: writtenAnswers[i] || { a: null, b: null }
+            });
+        }
     }
 
     const submission = {
@@ -290,22 +275,17 @@ async function submitTest() {
 
         const response = await fetch(`${API_BASE}/api/v1/results/submit`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(submission)
         });
 
-        // Both 200 (existing result) and 201 (new result) are success
         if (response.ok) {
             const result = await response.json();
 
-            // Disable further interaction
             document.getElementById('submit-btn').disabled = true;
             document.querySelectorAll('.option-btn').forEach(btn => btn.disabled = true);
             document.querySelectorAll('.math-input').forEach(mf => mf.disabled = true);
 
-            // Show results on page
             showResults(result);
         } else {
             let errorMessage = 'Topshirishda xatolik';
@@ -321,7 +301,7 @@ async function submitTest() {
     } catch (error) {
         console.error('Error submitting test:', error);
         alert('Testni topshirishda xatolik: ' + error.message);
-        isSubmitting = false; // Allow retry on error
+        isSubmitting = false;
     } finally {
         setLoading(false);
     }
@@ -341,12 +321,13 @@ window.addEventListener('DOMContentLoaded', loadSession);
 // Show results after submission
 function showResults(result) {
     const container = document.querySelector('.container');
+    const totalMCQ = currentTestType === 'prezident' ? 40 : 35;
 
     // Build MCQ results grid (5 per row)
-    const mcqAnswers = result.mcq_answers || [];
+    const mcqResults = result.mcq_answers || [];
     let mcqRows = '';
-    for (let i = 0; i < mcqAnswers.length; i += 5) {
-        const chunk = mcqAnswers.slice(i, i + 5);
+    for (let i = 0; i < mcqResults.length; i += 5) {
+        const chunk = mcqResults.slice(i, i + 5);
         const items = chunk.map(a => {
             const icon = a.is_correct ? '✅' : '❌';
             const cls = a.is_correct ? 'result-correct' : 'result-wrong';
@@ -355,11 +336,11 @@ function showResults(result) {
         mcqRows += `<div class="result-row">${items}</div>`;
     }
 
-    // Build written results
-    const writtenAnswers = result.written_answers || [];
+    // Build written results (only for sertifikat)
+    const writtenResults = result.written_answers || [];
     let writtenHTML = '';
-    if (writtenAnswers.length > 0) {
-        writtenHTML = writtenAnswers.map(wa => {
+    if (writtenResults.length > 0) {
+        writtenHTML = writtenResults.map(wa => {
             const iconA = (wa.score_a === 1) ? '✅' : '❌';
             const iconB = (wa.score_b === 1) ? '✅' : '❌';
             return `<div class="result-written-item">${wa.question_number}-savol: a) ${iconA}  b) ${iconB}</div>`;
@@ -370,6 +351,10 @@ function showResults(result) {
     const writtenScore = result.written_score || 0;
     const totalScore = result.total_score || 0;
 
+    // Adaptive display based on test type
+    const mcqLabel = currentTestType === 'prezident' ? `1-40` : `1-35`;
+    const mcqMax = currentTestType === 'prezident' ? 40 : 35;
+
     container.innerHTML = `
         <div class="results-page">
             <div class="results-header">
@@ -378,13 +363,13 @@ function showResults(result) {
             </div>
 
             <div class="results-section">
-                <h2>📝 Test savollari (1-35)</h2>
+                <h2>📝 Test savollari (${mcqLabel})</h2>
                 <div class="results-mcq-grid">
                     ${mcqRows}
                 </div>
             </div>
 
-            ${writtenAnswers.length > 0 ? `
+            ${writtenResults.length > 0 ? `
             <div class="results-section">
                 <h2>✍️ Yozma savollar (36-45)</h2>
                 <div class="results-written-grid">
@@ -398,12 +383,14 @@ function showResults(result) {
                 <div class="results-scores">
                     <div class="score-item">
                         <div class="score-label">📝 Test</div>
-                        <div class="score-value">${mcqScore}/35</div>
+                        <div class="score-value">${mcqScore}/${mcqMax}</div>
                     </div>
+                    ${currentTestType === 'sertifikat' ? `
                     <div class="score-item">
                         <div class="score-label">✍️ Yozma</div>
                         <div class="score-value">${writtenScore}/20</div>
                     </div>
+                    ` : ''}
                     <div class="score-item score-total">
                         <div class="score-label">⭐ Jami</div>
                         <div class="score-value">${totalScore}</div>

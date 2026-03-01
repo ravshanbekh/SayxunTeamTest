@@ -25,6 +25,7 @@ class Test(Base):
     start_time = Column(DateTime, nullable=True)   # Test boshlanish vaqti
     end_time = Column(DateTime, nullable=True)       # Test tugash vaqti
     extra_minutes = Column(Integer, default=0, nullable=False)  # Admin qo'shgan daqiqalar (max 15)
+    test_type = Column(String(20), default='sertifikat', nullable=False)  # 'sertifikat' or 'prezident'
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     
     # Relationships

@@ -125,6 +125,7 @@ async def get_test_with_key(
         "start_time": test.start_time,
         "end_time": test.end_time,
         "extra_minutes": test.extra_minutes,
+        "test_type": test.test_type or 'sertifikat',
         "created_at": test.created_at,
         "answer_key": None
     }
@@ -142,13 +143,14 @@ async def get_test_with_key(
 async def list_tests(
     skip: int = 0,
     limit: int = 100,
+    test_type: str | None = None,
     db: AsyncSession = Depends(get_db),
     current_admin: AdminUser = Depends(get_current_admin)
 ):
     """
-    List all tests (admin only).
+    List all tests (admin only). Filter by test_type if provided.
     """
-    tests = await get_all_tests(db, skip, limit)
+    tests = await get_all_tests(db, skip, limit, test_type=test_type)
     return tests
 
 

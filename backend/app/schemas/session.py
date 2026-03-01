@@ -25,6 +25,7 @@ class SessionResponse(BaseModel):
     is_valid: bool  # Computed property
     time_remaining_seconds: int
     test_title: str | None = None  # Test title for frontend
+    test_type: str | None = None   # 'sertifikat' or 'prezident'
     
     class Config:
         from_attributes = True

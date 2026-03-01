@@ -110,7 +110,8 @@ async def get_session(
         "is_expired": session.is_expired,
         "is_valid": session.is_valid,
         "time_remaining_seconds": session.time_remaining_seconds,
-        "test_title": session.test.title if session.test else None
+        "test_title": session.test.title if session.test else None,
+        "test_type": (session.test.test_type or 'sertifikat') if session.test else 'sertifikat'
     }
     
     return SessionResponse(**response_data)
