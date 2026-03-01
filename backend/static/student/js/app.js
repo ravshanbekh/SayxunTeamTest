@@ -94,16 +94,26 @@ async function loadSession() {
 
         document.getElementById('test-title').textContent = session.test_title || 'Test';
 
+        // Update section headers based on test type
+        if (currentTestType === 'prezident') {
+            document.getElementById('mcq-section-title').textContent = '1-qism: Test savollari (1-40)';
+            document.getElementById('mcq-section-instructions').innerHTML = '1-40 savollar: A, B, C yoki D ni tanlang';
+            // Hide written section entirely
+            document.getElementById('written-section').style.display = 'none';
+        } else {
+            document.getElementById('mcq-section-title').textContent = '1-qism: Test savollari (1-35)';
+            document.getElementById('mcq-section-instructions').innerHTML = '1-32 savollar: A, B, C yoki D ni tanlang<br>33-35 savollar: A, B, C, D, E yoki F ni tanlang';
+            document.getElementById('written-section').style.display = '';
+        }
+
         // Initialize UI based on test type
         createMCQGrid();
         if (currentTestType === 'sertifikat') {
             createWrittenFields();
         } else {
-            // Hide written section for prezident tests
+            // Clear written section for prezident tests
             const writtenContainer = document.getElementById('written-container');
             if (writtenContainer) writtenContainer.innerHTML = '';
-            const writtenHeader = document.querySelector('.written-section h2');
-            if (writtenHeader) writtenHeader.style.display = 'none';
         }
 
         // Start timer
