@@ -27,6 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.result import Result
 from app.models.test import AnswerKey
 from app.services.export_service import _load_export_data, _build_row_data
+from app.config import settings
 from app.services.rasch_service import compute_rasch, RaschResult, GRADE_THRESHOLDS
 
 logger = logging.getLogger(__name__)
@@ -121,7 +122,7 @@ async def build_rasch_report(db: AsyncSession, test_id: UUID) -> Optional[RaschR
         )
         entries.append((result_record, user, mcq_values + written_values))
 
-    analysis = compute_rasch([values for _, _, values in entries])
+    analysis = compute_rasch([values for _, _, values in entries], max_score=settings.RASCH_MAX_SCORE)
 
     rows = []
     for idx, (result_record, user, values) in enumerate(entries):
@@ -312,7 +313,7 @@ def export_rasch_to_pdf(report: RaschReport, filepath: str) -> str:
     rel = f"{analysis.reliability:.2f}" if analysis.reliability is not None else "-"
     elements.append(Spacer(1, 0.1 * inch))
     elements.append(Paragraph(
-        "Ballar Rasch modeli (CML + WLE) asosida hisoblangan: T = 50 + 10·Z, maksimal 75 ball. "
+        "Ballar Rasch modeli (CML + WLE) asosida hisoblangan: T = 50 + 10·Z (shartli maksimal 75, undan yuqori ham bo'lishi mumkin). "
         "Darajalar: A+ ≥70, A ≥65, B+ ≥60, B ≥55, C+ ≥50, C ≥46. "
         "Foiz: A+/A – 100%, qolganlari ball/65. 1-Fan = foiz·93 + 11, 2-Fan = foiz·63 + 11 "
         f"(majburiy fan 11 ball). Ishonchlilik (reliability): {rel}.",

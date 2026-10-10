@@ -99,7 +99,7 @@ async def process_result_code(message: Message, state: FSMContext):
             def fmt(v):
                 return "-" if v is None else f"{v:g}"
             text += "\n<b>🏅 Milliy sertifikat (Rasch) natijasi:</b>\n"
-            text += f"   🎯 Rasch ball: <b>{fmt(rasch['score'])}</b> / 75\n"
+            text += f"   🎯 Rasch ball: <b>{fmt(rasch['score'])}</b>\n"
             text += f"   🏆 Daraja: <b>{rasch['grade'] or 'sertifikat berilmaydi (46 dan past)'}</b>\n"
             if rasch.get('percent') is not None:
                 text += f"   📊 Foiz: {fmt(rasch['percent'])}%\n"

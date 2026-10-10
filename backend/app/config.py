@@ -3,7 +3,7 @@ Application configuration using Pydantic Settings.
 Loads environment variables from .env file or Railway environment.
 """
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import List
+from typing import List, Optional
 import os
 
 
@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     
     # Session
     SESSION_DURATION_MINUTES: int = 90
+    
+    # Rasch: T-ballni yuqoridan cheklash (bo'sh - cheklanmaydi, masalan 75)
+    RASCH_MAX_SCORE: Optional[float] = None
     
     # CORS - Railway deployment
     CORS_ORIGINS: str = "*"

@@ -15,7 +15,7 @@ np = pytest.importorskip("numpy")
 
 from app.services.rasch_service import (  # noqa: E402
     compute_rasch, estimate_item_difficulties, wle_theta, grade_for,
-    MAX_SCORE, MIN_SCORE,
+    NOMINAL_MAX_SCORE, MIN_SCORE,
 )
 
 
@@ -157,7 +157,7 @@ def test_scores_close_to_oracle(seed):
     res = compute_rasch(X.tolist())
     table = [wle_theta(k, b_true.tolist()) for k in range(56)]
     th_oracle = np.array([table[k] for k in X.sum(1)])
-    t_oracle = np.clip(50 + 10 * (th_oracle - th_oracle.mean()) / th_oracle.std(), 0, 75)
+    t_oracle = np.clip(50 + 10 * (th_oracle - th_oracle.mean()) / th_oracle.std(), 0, None)
     t_ours = np.array(res.scores)
     assert np.mean(np.abs(t_ours - t_oracle)) < 0.25
     assert np.max(np.abs(t_ours - t_oracle)) < 1.0
@@ -189,13 +189,13 @@ def test_scores_within_bounds_and_standardized(seed):
     X, _, _ = simulate(seed)
     res = compute_rasch(X.tolist())
     scores = np.array(res.scores)
-    assert scores.min() >= MIN_SCORE and scores.max() <= MAX_SCORE
+    assert scores.min() >= MIN_SCORE
     z = np.array(res.z_scores)
     assert abs(z.mean()) < 1e-9
     assert z.std() == pytest.approx(1.0, abs=1e-9)
     unclamped = 50 + 10 * z
     for s, u in zip(scores, unclamped):
-        expected = min(MAX_SCORE, max(MIN_SCORE, u))
+        expected = max(MIN_SCORE, u)
         assert s == pytest.approx(expected, abs=0.006)
 
 
@@ -336,8 +336,33 @@ def test_two_items_minimum():
     assert res.converged
 
 
-def test_high_score_capped_at_75():
-    # bitta juda kuchli talabgor, qolganlar past -> Z katta, 75 bilan cheklanadi
+def test_high_score_not_capped_by_default():
+    # 75 - shartli maksimal; rasmiy A+ oralig'i "70 – 75 va undan yuqori"
     rows = [[1] * 30] + [[1] * 3 + [0] * 27] * 40 + [[1] * 4 + [0] * 26] * 40
     res = compute_rasch(rows)
+    assert res.scores[0] > NOMINAL_MAX_SCORE
+    assert res.grades[0] == "A+" and res.percents[0] == 100.0
+    assert res.fan1[0] == 104.0 and res.fan2[0] == 74.0
+
+
+def test_optional_cap():
+    rows = [[1] * 30] + [[1] * 3 + [0] * 27] * 40 + [[1] * 4 + [0] * 26] * 40
+    res = compute_rasch(rows, max_score=75.0)
     assert res.scores[0] == 75.0
+    assert max(res.scores) == 75.0
+
+
+@pytest.mark.parametrize("seed", range(6000, 6020))
+def test_national_like_math_distribution_exceeds_75(seed):
+    # Milliy imtihonga o'xshash: o'rtacha talaba 55 tadan ~10-17 tasini topadi,
+    # kuchli talabalar ozchilik -> eng yuqori ballar 75 dan oshadi (90.14 kabi)
+    rng = np.random.default_rng(seed)
+    N, L = 3000, 55
+    b = rng.normal(1.5, 1.2, L)
+    th = np.concatenate([rng.normal(-0.3, 0.8, int(N * 0.9)), rng.normal(2.0, 0.9, N - int(N * 0.9))])
+    X = (rng.random((N, L)) < 1 / (1 + np.exp(-(th[:, None] - b[None, :])))).astype(int)
+    res = compute_rasch(X.tolist())
+    scores = np.array(res.scores)
+    assert 8 <= X.sum(1).mean() <= 20
+    assert scores.max() > 80
+    assert scores.mean() == pytest.approx(50, abs=0.5)

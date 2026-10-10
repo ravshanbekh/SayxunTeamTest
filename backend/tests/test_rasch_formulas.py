@@ -101,6 +101,13 @@ def test_percent_and_subject_points(score):
     assert MAJBURIY_MAX < f2 < f1 <= FAN1_MAX + MAJBURIY_MAX
 
 
+@pytest.mark.parametrize("score", [75.01, 80.0, 85.5, 90.14, 96.0])
+def test_scores_above_nominal_75_are_full(score):
+    assert grade_for(score) == "A+"
+    assert percent_for(score) == 100.0
+    assert subject_points(100.0) == (104.0, 74.0)
+
+
 @pytest.mark.parametrize("score", [0.0, 10.0, 30.0, 45.0, 45.99])
 def test_no_certificate_below_46(score):
     assert grade_for(score) is None

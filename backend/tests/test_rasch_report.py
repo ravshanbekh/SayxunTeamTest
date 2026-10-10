@@ -100,7 +100,7 @@ async def test_report_rows_sorted_and_consistent(db):
     assert [r.rank for r in report.rows] == list(range(1, 121))
     for r in report.rows:
         assert r.correct == sum(r.item_values)
-        assert 0 <= r.score <= 75
+        assert r.score >= 0
     # Bir xil to'g'ri javob -> bir xil Rasch ball (bitta variant)
     by_correct = {}
     for r in report.rows:

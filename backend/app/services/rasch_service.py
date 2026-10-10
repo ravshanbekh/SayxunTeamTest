@@ -6,7 +6,10 @@ Bilim va malakalarni baholash agentligi (BMBA) metodikasi:
   2. Rasch modeli:  P(x=1) = exp(θ - b) / (1 + exp(θ - b))
      θ - talabgor qobiliyati, b - topshiriq qiyinligi (logit).
   3. Qobiliyat standartlashtiriladi:  Z = (θ - μ) / σ
-  4. Standart ball:  T = 50 + 10·Z  (maksimal natija shartli ravishda 75 ball).
+  4. Standart ball:  T = 50 + 10·Z. Maksimal natija "shartli ravishda" 75 ball:
+     A+ oralig'i rasmiy hujjatda "70 – 75 va undan yuqori" deb berilgan, ya'ni
+     75 qat'iy chegara emas (matematikada 90.14 kabi sertifikatlar bor).
+     Shu sababli ball sukut bo'yicha 75 da kesilmaydi (max_score bilan cheklash mumkin).
   5. Darajalar: A+ (70+), A (65-69.9), B+ (60-64.9), B (55-59.9),
      C+ (50-54.9), C (46-49.9). 46 dan past - sertifikat berilmaydi.
   6. OTMga kirishda: A+ va A - 100%, qolganlari ball/65 proporsional.
@@ -35,7 +38,7 @@ import math
 # ---------------------------------------------------------------------------
 T_MEAN = 50.0
 T_SD = 10.0
-MAX_SCORE = 75.0
+NOMINAL_MAX_SCORE = 75.0  # shartli maksimal (kesilmaydi)
 MIN_SCORE = 0.0
 
 # A va A+ darajalar uchun 100% beriladi; qolganlari ball / 65
@@ -281,7 +284,7 @@ class RaschResult:
     thetas: List[float]
     theta_se: List[float]
     z_scores: List[float]
-    scores: List[float]                 # T-ball (0..75), 2 xonali
+    scores: List[float]                 # T-ball (>= 0), 2 xonali
     grades: List[Optional[str]]
     percents: List[Optional[float]]
     fan1: List[Optional[float]]
@@ -353,12 +356,18 @@ def estimate_item_difficulties(matrix: Sequence[Sequence[int]], max_iter: int = 
     return difficulties, extreme, converged, iterations
 
 
-def compute_rasch(matrix: Sequence[Sequence[int]], max_iter: int = 500, tol: float = 1e-6) -> RaschResult:
+def compute_rasch(
+    matrix: Sequence[Sequence[int]],
+    max_iter: int = 500,
+    tol: float = 1e-6,
+    max_score: Optional[float] = None,
+) -> RaschResult:
     """
     To'liq Rasch tahlili: topshiriq qiyinliklari, qobiliyatlar, T-ball,
     darajalar, foiz va OTM ballari.
 
     matrix - N x L ro'yxat (talabgor x topshiriq), qiymatlar 0/1.
+    max_score - T-ballni yuqoridan cheklash (None - cheklanmaydi, BMBA kabi).
     """
     matrix = [[1 if x else 0 for x in row] for row in matrix]
     N = len(matrix)
@@ -422,7 +431,12 @@ def compute_rasch(matrix: Sequence[Sequence[int]], max_iter: int = 500, tol: flo
     else:
         z_scores = [(t - mean) / sd for t in thetas]
 
-    scores = [round2(min(MAX_SCORE, max(MIN_SCORE, T_MEAN + T_SD * z))) for z in z_scores]
+    scores = []
+    for z in z_scores:
+        t = max(MIN_SCORE, T_MEAN + T_SD * z)
+        if max_score is not None:
+            t = min(max_score, t)
+        scores.append(round2(t))
     grades = [grade_for(s) for s in scores]
     percents = [percent_for(s) for s in scores]
     fans = [subject_points(p) for p in percents]
