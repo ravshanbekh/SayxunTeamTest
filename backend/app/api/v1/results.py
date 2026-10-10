@@ -238,9 +238,41 @@ async def get_user_result_by_test_code(
     written_result = await db.execute(stmt)
     written_answers_list = written_result.scalars().all()
     
+    # Rasch natijasi: barcha ishtirokchilar asosida hisoblanadi, shuning uchun
+    # test vaqti tugagandan keyin e'lon qilinadi (sertifikat testlari uchun)
+    test_type = getattr(test, "test_type", None) or "sertifikat"
+    rasch = None
+    rasch_pending = False
+    if test_type == "sertifikat":
+        from datetime import timedelta
+        from app.utils.timer import now_uz
+        from app.services.rasch_report_service import get_cached_rasch_report
+
+        test_end = test.end_time + timedelta(minutes=test.extra_minutes or 0) if test.end_time else None
+        if test_end and now_uz() < test_end:
+            rasch_pending = True
+        else:
+            report = await get_cached_rasch_report(db, test.id)
+            row = report.row_for_user(result_record.user_id) if report else None
+            if row:
+                rasch = {
+                    "rank": row.rank,
+                    "participants": len(report.rows),
+                    "correct": row.correct,
+                    "total_items": len(report.item_labels),
+                    "score": row.score,
+                    "percent": row.percent,
+                    "grade": row.grade,
+                    "fan1": row.fan1,
+                    "fan2": row.fan2,
+                }
+
     return {
         "test_title": test.title,
         "test_code": test.test_code,
+        "test_type": test_type,
+        "rasch": rasch,
+        "rasch_pending": rasch_pending,
         "mcq_score": result_record.mcq_score,
         "written_score": result_record.written_score,
         "total_score": result_record.total_score,

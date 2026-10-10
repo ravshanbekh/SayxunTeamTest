@@ -226,6 +226,14 @@ body {
     background: #667eea !important;
 }
 
+.btn-rasch {
+    background: #2f855a !important;
+}
+
+.btn-rasch:hover {
+    background: #276749 !important;
+}
+
 .btn-edit {
     background: #ed8936 !important;
 }

@@ -103,6 +103,9 @@ function buildTestCard(test) {
             <div class="test-card-actions">
                 <button class="btn-export" onclick="exportExcel('${test.id}')">📊 Excel yuklab olish</button>
                 <button class="btn-export" onclick="exportPDF('${test.id}')">📄 PDF yuklab olish</button>
+                ${(test.test_type || 'sertifikat') === 'sertifikat' ? `
+                <button class="btn-rasch" onclick="exportRasch('${test.id}', 'pdf')">🏅 Rasch natija (PDF)</button>
+                <button class="btn-rasch" onclick="exportRasch('${test.id}', 'excel')">🏅 Rasch natija (Excel)</button>` : ''}
                 <button class="btn-edit" onclick="openEditModal('${test.id}', '${test.test_type || 'sertifikat'}')">✏️ Tahrirlash</button>
                 <button class="btn-primary" onclick="extendAllSessions('${test.id}', '${test.title}')">⏱️ +5 min</button>
                 <button class="btn-delete" onclick="deleteTest('${test.id}', '${test.title}')">🗑️ O'chirish</button>
@@ -180,6 +183,23 @@ async function exportPDF(testId) {
         URL.revokeObjectURL(url);
     } catch (error) {
         alert('PDF export xatolik: ' + error.message);
+    }
+}
+
+// Rasch modeli asosidagi milliy sertifikat uslubidagi natijalar
+async function exportRasch(testId, format) {
+    try {
+        const response = await fetch(`${API_BASE}/api/v1/admin/reports/${testId}/rasch/${format}`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` }
+        });
+        if (!response.ok) throw new Error('Yuklab olishda xatolik');
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = format === 'pdf' ? 'rasch_natijalar.pdf' : 'rasch_natijalar.xlsx'; a.click();
+        URL.revokeObjectURL(url);
+    } catch (error) {
+        alert('Rasch natija xatolik: ' + error.message);
     }
 }
 
@@ -507,6 +527,7 @@ document.getElementById('create-prezident-form').addEventListener('submit', asyn
 // ==========================================
 window.exportExcel = exportExcel;
 window.exportPDF = exportPDF;
+window.exportRasch = exportRasch;
 window.deleteTest = deleteTest;
 window.openEditModal = openEditModal;
 window.clearSessions = clearSessions;

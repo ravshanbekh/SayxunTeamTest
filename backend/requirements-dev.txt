@@ -1,0 +1,8 @@
+# Test uchun qo'shimcha kutubxonalar (production'da kerak emas)
+-r requirements.txt
+pytest>=8.0
+pytest-asyncio>=0.23
+httpx>=0.27
+numpy>=1.26
+scipy>=1.11
+girth>=0.8.0

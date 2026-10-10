@@ -148,6 +148,116 @@ async def export_test_results_pdf(
     )
 
 
+async def _rasch_report_or_404(db: AsyncSession, test_id: UUID):
+    from app.services.rasch_report_service import build_rasch_report
+
+    report = await build_rasch_report(db, test_id)
+    if report is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Test topilmadi"
+        )
+    return report
+
+
+@router.get("/reports/{test_id}/rasch")
+async def get_rasch_results(
+    test_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_admin: AdminUser = Depends(get_current_admin)
+):
+    """
+    Rasch modeli asosidagi natijalar (JSON) - milliy sertifikat uslubida (admin only).
+    """
+    report = await _rasch_report_or_404(db, test_id)
+    analysis = report.analysis
+    return {
+        "test_id": str(report.test.id),
+        "test_code": report.test.test_code,
+        "title": report.test.title,
+        "participants": len(report.rows),
+        "items": len(report.item_labels),
+        "reliability": analysis.reliability,
+        "grade_counts": report.grade_counts(),
+        "warnings": analysis.warnings,
+        "results": [
+            {
+                "rank": r.rank,
+                "user_id": str(r.user_id),
+                "name": r.name,
+                "region": r.region,
+                "correct": r.correct,
+                "theta": round(r.theta, 4),
+                "rasch_score": r.score,
+                "percent": r.percent,
+                "grade": r.grade,
+                "fan1": r.fan1,
+                "fan2": r.fan2,
+            }
+            for r in report.rows
+        ],
+        "item_analysis": [
+            {
+                "item": label,
+                "correct_count": item.correct_count,
+                "difficulty": round(item.difficulty, 4),
+                "extreme": item.extreme,
+            }
+            for label, item in zip(report.item_labels, analysis.items)
+        ],
+    }
+
+
+@router.get("/reports/{test_id}/rasch/pdf")
+async def export_rasch_pdf(
+    test_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_admin: AdminUser = Depends(get_current_admin)
+):
+    """
+    Rasch natijalari PDF (rangli jadval, milliy sertifikat ko'rinishida) - admin only.
+    """
+    from app.services.rasch_report_service import export_rasch_to_pdf
+
+    report = await _rasch_report_or_404(db, test_id)
+    filepath = os.path.join(settings.EXPORT_DIR, f"test_{test_id}_rasch.pdf")
+    export_rasch_to_pdf(report, filepath)
+
+    with open(filepath, "rb") as f:
+        content = f.read()
+
+    return Response(
+        content=content,
+        media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=rasch_natijalar.pdf"}
+    )
+
+
+@router.get("/reports/{test_id}/rasch/excel")
+async def export_rasch_excel(
+    test_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_admin: AdminUser = Depends(get_current_admin)
+):
+    """
+    Rasch natijalari Excel (natijalar, savollar tahlili, 0/1 matritsa) - admin only.
+    """
+    from app.services.rasch_report_service import export_rasch_to_excel
+
+    report = await _rasch_report_or_404(db, test_id)
+    filepath = os.path.join(settings.EXPORT_DIR, f"test_{test_id}_rasch.xlsx")
+    export_rasch_to_excel(report, filepath)
+
+    with open(filepath, "rb") as f:
+        content = f.read()
+
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=rasch_natijalar.xlsx"}
+    )
+
+
 @router.delete("/sessions/{test_id}", status_code=status.HTTP_200_OK)
 async def clear_test_sessions(
     test_id: UUID,

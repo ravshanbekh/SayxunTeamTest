@@ -74,3 +74,30 @@ Admin panelda:
 2. Barcha natijalar ko'rinadi
 3. Yozma javoblarni qo'lda baholang
 4. Excel yoki PDF export qiling
+
+## Rasch natijalari (milliy sertifikat uslubida)
+
+Sertifikat testi kartasida ikkita tugma bor:
+- **🏅 Rasch natija (PDF)**: rangli jadval (№, Ism familiya, To'g'ri, Rash, Foiz, Daraja, 1-Fan, 2-Fan)
+- **🏅 Rasch natija (Excel)**: shu jadval, savollar tahlili (qiyinlik, logit) va 0/1 javoblar matritsasi
+
+Hisoblash tartibi (BMBA metodikasi):
+1. 55 ta topshiriq (1–35 test, 36a–45b yozma qismlar) 0/1 ko'rinishida olinadi.
+2. Topshiriq qiyinliklari Rasch modeli bo'yicha CML usulida, talabgor qobiliyati (θ) esa WLE usulida baholanadi.
+3. Standartlashtirish: `Z = (θ − o'rtacha) / standart og'ish`, `T = 50 + 10·Z`, maksimal 75 ball.
+4. Darajalar: A+ ≥ 70, A ≥ 65, B+ ≥ 60, B ≥ 55, C+ ≥ 50, C ≥ 46 (46 dan past bo'lsa sertifikat berilmaydi).
+5. Foiz: A+ va A uchun 100%, qolganlari uchun `ball / 65`.
+6. `1-Fan = foiz × 93 + 11`, `2-Fan = foiz × 63 + 11` (majburiy fan uchun 11 ball to'liq beriladi).
+
+Eslatmalar:
+- Ball barcha ishtirokchilarga nisbatan hisoblanadi, shuning uchun natija test tugagandan keyin yakuniy bo'ladi.
+  Botda talaba Rasch natijasini test tugash vaqti (`end_time` + qo'shimcha daqiqalar) o'tgandan keyin ko'radi.
+- Bitta variantda bir xil sondagi to'g'ri javob bir xil Rasch ball beradi, chunki Rasch modelida xom ball yetarli statistika hisoblanadi.
+- Ishtirokchilar 30 tadan kam bo'lsa, hisobotda ogohlantirish chiqadi.
+
+Testlarni ishga tushirish:
+```bash
+cd backend
+pip install -r requirements-dev.txt
+pytest -q
+```

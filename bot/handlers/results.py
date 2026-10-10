@@ -46,8 +46,8 @@ async def process_result_code(message: Message, state: FSMContext):
         text += f"🔑 Kod: {result['test_code']}\n\n"
         
         # MCQ results (1-35)
-        text += "<b>📝 Test savollari (1-35):</b>\n"
         mcq_answers = result.get('mcq_answers', [])
+        text += f"<b>📝 Test savollari (1-{len(mcq_answers) or 35}):</b>\n"
         
         # Show in rows of 5 for readability
         for i in range(0, len(mcq_answers), 5):
@@ -88,10 +88,26 @@ async def process_result_code(message: Message, state: FSMContext):
         total_score = result.get('total_score', 0)
         
         text += "<b>📈 Umumiy natija:</b>\n"
-        text += f"   📝 Test: {mcq_score}/35\n"
-        text += f"   ✍️ Yozma: {written_score}/20\n"
+        text += f"   📝 Test: {mcq_score}/{len(mcq_answers) or 35}\n"
+        if written_answers:
+            text += f"   ✍️ Yozma: {written_score}/20\n"
         text += f"   ⭐️ Jami: {total_score}\n"
-        
+
+        # Rasch (milliy sertifikat uslubidagi) natija
+        rasch = result.get('rasch')
+        if rasch:
+            def fmt(v):
+                return "-" if v is None else f"{v:g}"
+            text += "\n<b>🏅 Milliy sertifikat (Rasch) natijasi:</b>\n"
+            text += f"   🎯 Rasch ball: <b>{fmt(rasch['score'])}</b> / 75\n"
+            text += f"   🏆 Daraja: <b>{rasch['grade'] or 'sertifikat berilmaydi (46 dan past)'}</b>\n"
+            if rasch.get('percent') is not None:
+                text += f"   📊 Foiz: {fmt(rasch['percent'])}%\n"
+                text += f"   🎓 1-fan: {fmt(rasch['fan1'])} ball | 2-fan: {fmt(rasch['fan2'])} ball\n"
+            text += f"   🥇 O'rin: {rasch['rank']} / {rasch['participants']}\n"
+        elif result.get('rasch_pending'):
+            text += "\n⏳ <i>Rasch (sertifikat) natijasi test vaqti tugagach e'lon qilinadi.</i>\n"
+
         await state.clear()
         await message.answer(
             text,
