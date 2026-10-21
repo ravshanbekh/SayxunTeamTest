@@ -33,6 +33,7 @@ class Test(Base):
     answer_key = relationship("AnswerKey", back_populates="test", uselist=False, cascade="all, delete-orphan")
     sessions = relationship("TestSession", back_populates="test", cascade="all, delete-orphan")
     results = relationship("Result", back_populates="test", cascade="all, delete-orphan")
+    offline_results = relationship("OfflineResult", cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<Test {self.test_code}: {self.title}>"
@@ -54,3 +55,6 @@ class AnswerKey(Base):
     
     def __repr__(self):
         return f"<AnswerKey for Test {self.test_id}>"
+
+
+from app.models.offline import OfflineResult  # noqa: E402,F401 - relationship uchun ro'yxatdan o'tkazish

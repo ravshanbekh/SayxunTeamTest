@@ -234,6 +234,14 @@ body {
     background: #276749 !important;
 }
 
+.btn-offline {
+    background: #805ad5 !important;
+}
+
+.btn-offline:hover {
+    background: #6b46c1 !important;
+}
+
 .btn-edit {
     background: #ed8936 !important;
 }

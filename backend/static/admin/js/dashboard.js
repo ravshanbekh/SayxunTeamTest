@@ -105,7 +105,10 @@ function buildTestCard(test) {
                 <button class="btn-export" onclick="exportPDF('${test.id}')">📄 PDF yuklab olish</button>
                 ${(test.test_type || 'sertifikat') === 'sertifikat' ? `
                 <button class="btn-rasch" onclick="exportRasch('${test.id}', 'pdf')">🏅 Rasch natija (PDF)</button>
-                <button class="btn-rasch" onclick="exportRasch('${test.id}', 'excel')">🏅 Rasch natija (Excel)</button>` : ''}
+                <button class="btn-rasch" onclick="exportRasch('${test.id}', 'excel')">🏅 Rasch natija (Excel)</button>
+                <button class="btn-offline" onclick="downloadOfflineTemplate('${test.id}')">📥 Offline shablon</button>
+                <button class="btn-offline" onclick="uploadOfflineResults('${test.id}')">📤 Offline natija yuklash</button>
+                <button class="btn-offline" onclick="manageOfflineResults('${test.id}')">📋 Offline natijalar</button>` : ''}
                 <button class="btn-edit" onclick="openEditModal('${test.id}', '${test.test_type || 'sertifikat'}')">✏️ Tahrirlash</button>
                 <button class="btn-primary" onclick="extendAllSessions('${test.id}', '${test.title}')">⏱️ +5 min</button>
                 <button class="btn-delete" onclick="deleteTest('${test.id}', '${test.title}')">🗑️ O'chirish</button>
@@ -200,6 +203,84 @@ async function exportRasch(testId, format) {
         URL.revokeObjectURL(url);
     } catch (error) {
         alert('Rasch natija xatolik: ' + error.message);
+    }
+}
+
+// ==========================================
+// OFFLINE NATIJALAR (Excel 0/1)
+// ==========================================
+async function downloadBlob(url, filename) {
+    const response = await fetch(`${API_BASE}${url}`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` }
+    });
+    if (!response.ok) throw new Error('Yuklab olishda xatolik');
+    const blob = await response.blob();
+    const link = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = link; a.download = filename; a.click();
+    URL.revokeObjectURL(link);
+}
+
+async function downloadOfflineTemplate(testId) {
+    try {
+        await downloadBlob(`/api/v1/admin/tests/${testId}/offline/template`, 'offline_shablon.xlsx');
+    } catch (error) {
+        alert('Shablon xatolik: ' + error.message);
+    }
+}
+
+function uploadOfflineResults(testId) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.xlsx';
+    input.onchange = async () => {
+        const file = input.files[0];
+        if (!file) return;
+        const form = new FormData();
+        form.append('file', file);
+        try {
+            const response = await fetch(`${API_BASE}/api/v1/admin/tests/${testId}/offline/upload`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` },
+                body: form
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                const detail = data.detail || {};
+                const message = typeof detail === 'string' ? detail : (detail.message || 'Xatolik');
+                const errors = (detail.errors || []).slice(0, 20).join('\n');
+                alert('❌ ' + message + (errors ? '\n\n' + errors : ''));
+                return;
+            }
+            alert('✅ ' + data.message +
+                (data.replaced ? `\n(oldingi ${data.replaced} ta offline natija almashtirildi)` : '') +
+                '\n\nOffline natijalar Rasch hisobotiga onlayn natijalar bilan birga kiradi.');
+        } catch (error) {
+            alert('Yuklashda xatolik: ' + error.message);
+        }
+    };
+    input.click();
+}
+
+async function manageOfflineResults(testId) {
+    try {
+        const response = await apiRequest(`/api/v1/admin/tests/${testId}/offline`);
+        const data = await response.json();
+        if (data.count === 0) {
+            alert("Bu test uchun offline natijalar yuklanmagan.\n\n'📥 Offline shablon' tugmasi orqali shablonni oling, to'ldiring va '📤 Offline natija yuklash' orqali yuklang.");
+            return;
+        }
+        const preview = data.results.slice(0, 15)
+            .map((r, i) => `${i + 1}. ${r.name}${r.region ? ' (' + r.region + ')' : ''} — ${r.correct} ta to'g'ri`)
+            .join('\n');
+        const more = data.count > 15 ? `\n... va yana ${data.count - 15} ta` : '';
+        if (confirm(`Offline natijalar: ${data.count} ta\n\n${preview}${more}\n\nBarcha offline natijalarni O'CHIRISH uchun OK bosing.`)) {
+            const del = await apiRequest(`/api/v1/admin/tests/${testId}/offline`, { method: 'DELETE' });
+            const result = await del.json();
+            alert(result.message);
+        }
+    } catch (error) {
+        alert('Xatolik: ' + error.message);
     }
 }
 
@@ -528,6 +609,9 @@ document.getElementById('create-prezident-form').addEventListener('submit', asyn
 window.exportExcel = exportExcel;
 window.exportPDF = exportPDF;
 window.exportRasch = exportRasch;
+window.downloadOfflineTemplate = downloadOfflineTemplate;
+window.uploadOfflineResults = uploadOfflineResults;
+window.manageOfflineResults = manageOfflineResults;
 window.deleteTest = deleteTest;
 window.openEditModal = openEditModal;
 window.clearSessions = clearSessions;

@@ -24,6 +24,7 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.offline import OfflineResult
 from app.models.result import Result
 from app.models.test import AnswerKey
 from app.services.export_service import _load_export_data, _build_row_data
@@ -52,8 +53,8 @@ HEADERS = ["№", "Ism familiya", "To'g'ri", "Rash", "Foiz", "Daraja", "1-Fan", 
 @dataclass
 class RaschRow:
     rank: int
-    result_id: UUID
-    user_id: UUID
+    result_id: Optional[UUID]
+    user_id: Optional[UUID]
     name: str
     region: str
     correct: int
@@ -64,6 +65,7 @@ class RaschRow:
     grade: Optional[str]
     fan1: Optional[float]
     fan2: Optional[float]
+    source: str = "online"  # "online" yoki "offline"
 
 
 @dataclass
@@ -79,6 +81,10 @@ class RaschReport:
             if row.user_id == user_id:
                 return row
         return None
+
+    def source_counts(self) -> Dict[str, int]:
+        online = sum(1 for row in self.rows if row.source == "online")
+        return {"online": online, "offline": len(self.rows) - online}
 
     def grade_counts(self) -> Dict[str, int]:
         counts = {grade: 0 for _, grade in GRADE_THRESHOLDS}
@@ -120,18 +126,34 @@ async def build_rasch_report(db: AsyncSession, test_id: UUID) -> Optional[RaschR
             written_by_result.get(result_record.id, []),
             written_key, test_type,
         )
-        entries.append((result_record, user, mcq_values + written_values))
+        entries.append(dict(
+            result_id=result_record.id, user_id=result_record.user_id, source="online",
+            name=f"{user.full_name or ''} {user.surname or ''}".strip(),
+            region=user.region or "", values=mcq_values + written_values,
+        ))
 
-    analysis = compute_rasch([values for _, _, values in entries], max_score=settings.RASCH_MAX_SCORE)
+    # Offline (qog'ozda) topshirilgan natijalar - umumiy Rasch hisobiga qo'shiladi
+    stmt = select(OfflineResult).where(OfflineResult.test_id == test_id).order_by(OfflineResult.created_at)
+    for offline in (await db.execute(stmt)).scalars().all():
+        values = [1 if v else 0 for v in (offline.answers or [])][:len(labels)]
+        values += [0] * (len(labels) - len(values))
+        entries.append(dict(
+            result_id=offline.id, user_id=None, source="offline",
+            name=offline.full_name, region=offline.region or "", values=values,
+        ))
+
+    analysis = compute_rasch([e["values"] for e in entries], max_score=settings.RASCH_MAX_SCORE)
 
     rows = []
-    for idx, (result_record, user, values) in enumerate(entries):
+    for idx, entry in enumerate(entries):
+        values = entry["values"]
         rows.append(RaschRow(
             rank=0,
-            result_id=result_record.id,
-            user_id=result_record.user_id,
-            name=f"{user.full_name or ''} {user.surname or ''}".strip(),
-            region=user.region or "",
+            result_id=entry["result_id"],
+            user_id=entry["user_id"],
+            name=entry["name"],
+            region=entry["region"],
+            source=entry["source"],
             correct=analysis.raw_scores[idx],
             item_values=values,
             theta=analysis.thetas[idx],
@@ -166,7 +188,10 @@ async def get_cached_rasch_report(db: AsyncSession, test_id: UUID) -> Optional[R
         [answer_key.mcq_answers, answer_key.written_questions] if answer_key else None,
         sort_keys=True, default=str,
     )
-    signature = (count, last_submit, key_sig)
+    stmt = select(func.count(OfflineResult.id), func.max(OfflineResult.created_at)).where(
+        OfflineResult.test_id == test_id)
+    offline_count, offline_last = (await db.execute(stmt)).one()
+    signature = (count, last_submit, offline_count, offline_last, key_sig)
 
     cached = _report_cache.get(test_id)
     if cached and cached[0] == signature:
@@ -260,7 +285,8 @@ def export_rasch_to_pdf(report: RaschReport, filepath: str) -> str:
     elements = [
         Paragraph(_pdf_safe(f"{report.test.title} — Rasch natijalari"), title_style),
         Paragraph(
-            f"Kod: {report.test.test_code} | Ishtirokchilar: {len(report.rows)} | "
+            f"Kod: {report.test.test_code} | Ishtirokchilar: {len(report.rows)} "
+            f"(onlayn: {report.source_counts()['online']}, offline: {report.source_counts()['offline']}) | "
             f"Topshiriqlar: {len(report.item_labels)} | "
             f"Sana: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
             info_style,
@@ -342,7 +368,7 @@ def export_rasch_to_excel(report: RaschReport, filepath: str) -> str:
     fills = {g: PatternFill(start_color=c.lstrip("#"), end_color=c.lstrip("#"), fill_type="solid")
              for g, c in GRADE_COLORS.items()}
 
-    ws.append(HEADERS)
+    ws.append(HEADERS + ["Manba"])
     for cell in ws[1]:
         cell.fill = header_fill
         cell.font = Font(bold=True)
@@ -356,6 +382,7 @@ def export_rasch_to_excel(report: RaschReport, filepath: str) -> str:
             r.grade or "-",
             r.fan1 if r.fan1 is not None else "-",
             r.fan2 if r.fan2 is not None else "-",
+            "Offline" if r.source == "offline" else "Onlayn",
         ])
         row_idx = ws.max_row
         for cell in ws[row_idx]:
@@ -367,7 +394,7 @@ def export_rasch_to_excel(report: RaschReport, filepath: str) -> str:
         ws.cell(row=row_idx, column=7).number_format = "0.00"
         ws.cell(row=row_idx, column=8).number_format = "0.00"
 
-    for col, width in zip("ABCDEFGH", [6, 34, 9, 9, 10, 9, 10, 10]):
+    for col, width in zip("ABCDEFGHI", [6, 34, 9, 9, 10, 9, 10, 10, 10]):
         ws.column_dimensions[col].width = width
     ws.freeze_panes = "A2"
 

@@ -101,3 +101,21 @@ cd backend
 pip install -r requirements-dev.txt
 pytest -q
 ```
+
+## Offline (qog'ozda) o'tkazilgan imtihon natijalari
+
+Imtihonni bir qism talabalar qog'ozda topshirgan bo'lsa, ularning natijalari onlayn natijalarga qo'shiladi
+va **umumiy Rasch hisobiga** kiradi.
+
+1. Sertifikat testi kartasida **📥 Offline shablon** tugmasini bosing. Excel shablon yuklab olinadi.
+2. `Natijalar` varag'ini to'ldiring: har bir qatorga bitta talaba, `Ism familiya` (majburiy), `Viloyat` (ixtiyoriy),
+   har bir savol ustuniga `1` (to'g'ri) yoki `0` (xato). Bo'sh katak `0` deb hisoblanadi.
+   Sertifikat testida ustunlar: `1`–`35` va yozma savollar uchun `36a`, `36b`, … `45b`.
+3. **📤 Offline natija yuklash** tugmasi bilan faylni yuklang. Faylda xato bo'lsa (masalan `2` yoki `A`),
+   qaysi qator va qaysi savolda ekani ko'rsatiladi va hech narsa saqlanmaydi.
+4. Qayta yuklansa, shu testning oldingi offline natijalari yangisi bilan **almashtiriladi**.
+5. **📋 Offline natijalar** tugmasi yuklanganlar ro'yxatini ko'rsatadi; u yerdan ularni o'chirish ham mumkin.
+
+Rasch hisobotida (PDF/Excel) onlayn va offline talabalar bitta jadvalda chiqadi. PDF sarlavhasida ularning soni
+alohida ko'rsatiladi, Excel'dagi `Manba` ustunida esa har bir talaba onlayn yoki offline ekani yoziladi.
+Botda onlayn talabaning o'rni ham offline talabalar bilan birga hisoblanadi.

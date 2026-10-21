@@ -1,7 +1,7 @@
 """
 Admin endpoints - grading, student management, and exports.
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Response
+from fastapi import APIRouter, Depends, HTTPException, status, Response, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from uuid import UUID
@@ -176,6 +176,7 @@ async def get_rasch_results(
         "test_code": report.test.test_code,
         "title": report.test.title,
         "participants": len(report.rows),
+        "source_counts": report.source_counts(),
         "items": len(report.item_labels),
         "reliability": analysis.reliability,
         "grade_counts": report.grade_counts(),
@@ -183,7 +184,8 @@ async def get_rasch_results(
         "results": [
             {
                 "rank": r.rank,
-                "user_id": str(r.user_id),
+                "source": r.source,
+                "user_id": str(r.user_id) if r.user_id else None,
                 "name": r.name,
                 "region": r.region,
                 "correct": r.correct,
@@ -256,6 +258,106 @@ async def export_rasch_excel(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": "attachment; filename=rasch_natijalar.xlsx"}
     )
+
+
+# ---------------------------------------------------------------------------
+# Offline natijalar (qog'ozda o'tkazilgan imtihon, Excel 0/1)
+# ---------------------------------------------------------------------------
+MAX_OFFLINE_FILE_BYTES = 10 * 1024 * 1024
+
+
+async def _test_or_404(db: AsyncSession, test_id: UUID):
+    from app.models.test import Test
+
+    test = (await db.execute(select(Test).where(Test.id == test_id))).scalars().first()
+    if not test:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Test topilmadi")
+    return test
+
+
+@router.get("/tests/{test_id}/offline/template")
+async def download_offline_template(
+    test_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_admin: AdminUser = Depends(get_current_admin)
+):
+    """Offline natijalarni kiritish uchun Excel shablon (admin only)."""
+    from app.services.offline_service import build_template
+
+    test = await _test_or_404(db, test_id)
+    content = build_template(test, test.test_type or "sertifikat")
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=offline_shablon.xlsx"}
+    )
+
+
+@router.post("/tests/{test_id}/offline/upload")
+async def upload_offline_results(
+    test_id: UUID,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_admin: AdminUser = Depends(get_current_admin)
+):
+    """
+    To'ldirilgan shablonni yuklash (admin only).
+    Testning oldingi offline natijalari yangisi bilan almashtiriladi.
+    """
+    from app.services.offline_service import parse_offline_excel, replace_offline_results, OfflineImportError
+
+    test = await _test_or_404(db, test_id)
+    content = await file.read(MAX_OFFLINE_FILE_BYTES + 1)
+    if len(content) > MAX_OFFLINE_FILE_BYTES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail={"message": "Fayl juda katta (maksimal 10 MB)", "errors": []})
+    try:
+        rows = parse_offline_excel(content, test.test_type or "sertifikat")
+    except OfflineImportError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail={"message": e.message, "errors": e.errors})
+
+    imported, replaced = await replace_offline_results(db, test_id, rows)
+    return {
+        "message": f"{imported} ta offline natija yuklandi",
+        "imported": imported,
+        "replaced": replaced,
+    }
+
+
+@router.get("/tests/{test_id}/offline")
+async def get_offline_results(
+    test_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_admin: AdminUser = Depends(get_current_admin)
+):
+    """Yuklangan offline natijalar ro'yxati (admin only)."""
+    from app.services.offline_service import list_offline_results
+
+    await _test_or_404(db, test_id)
+    items = await list_offline_results(db, test_id)
+    return {
+        "count": len(items),
+        "results": [
+            {"id": str(o.id), "name": o.full_name, "region": o.region,
+             "correct": sum(1 for v in (o.answers or []) if v)}
+            for o in items
+        ],
+    }
+
+
+@router.delete("/tests/{test_id}/offline")
+async def remove_offline_results(
+    test_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_admin: AdminUser = Depends(get_current_admin)
+):
+    """Testning barcha offline natijalarini o'chirish (admin only)."""
+    from app.services.offline_service import delete_offline_results
+
+    await _test_or_404(db, test_id)
+    deleted = await delete_offline_results(db, test_id)
+    return {"message": f"{deleted} ta offline natija o'chirildi", "deleted": deleted}
 
 
 @router.delete("/sessions/{test_id}", status_code=status.HTTP_200_OK)

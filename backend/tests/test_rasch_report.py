@@ -120,7 +120,7 @@ async def test_pdf_and_excel_export(db, tmp_path):
     xlsx_path = export_rasch_to_excel(report, str(tmp_path / "rasch.xlsx"))
     wb = load_workbook(xlsx_path)
     ws = wb["Rasch natijalar"]
-    assert [c.value for c in ws[1]] == ["№", "Ism familiya", "To'g'ri", "Rash", "Foiz", "Daraja", "1-Fan", "2-Fan"]
+    assert [c.value for c in ws[1]] == ["№", "Ism familiya", "To'g'ri", "Rash", "Foiz", "Daraja", "1-Fan", "2-Fan", "Manba"]
     assert ws.max_row == 81
     assert ws["D2"].value == report.rows[0].score
     assert len(list(wb["Savollar tahlili"].iter_rows())) == 56

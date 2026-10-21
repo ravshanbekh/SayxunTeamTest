@@ -3,7 +3,7 @@ import asyncio
 from app.database import init_db
 
 # Import all models to register them with Base
-from app.models import user, admin, test, session, result
+from app.models import user, admin, test, session, result, offline
 
 async def main():
     print("Creating database tables...")
