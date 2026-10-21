@@ -24,6 +24,8 @@ A comprehensive automated testing platform with Telegram bot integration, web in
 
 ## 🛠️ Quick Start
 
+> **Production (Contabo VPS, Docker + HTTPS):** [DEPLOY_CONTABO.md](DEPLOY_CONTABO.md) qo'llanmasiga qarang.
+
 ### Prerequisites
 
 - Docker and Docker Compose

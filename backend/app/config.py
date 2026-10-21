@@ -2,6 +2,7 @@
 Application configuration using Pydantic Settings.
 Loads environment variables from .env file or Railway environment.
 """
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List, Optional
 import os
@@ -27,6 +28,12 @@ class Settings(BaseSettings):
     
     # Rasch: T-ballni yuqoridan cheklash (bo'sh - cheklanmaydi, masalan 75)
     RASCH_MAX_SCORE: Optional[float] = None
+
+    @field_validator("RASCH_MAX_SCORE", mode="before")
+    @classmethod
+    def _empty_as_none(cls, value):
+        # docker-compose bo'sh qiymatni "" sifatida uzatadi
+        return None if value in ("", None) else value
     
     # CORS - Railway deployment
     CORS_ORIGINS: str = "*"

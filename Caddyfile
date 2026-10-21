@@ -1,0 +1,9 @@
+# Caddy avtomatik ravishda Let's Encrypt HTTPS sertifikatini oladi va yangilaydi.
+# DOMAIN .env faylida beriladi (masalan: test.example.uz)
+{$DOMAIN} {
+	encode gzip
+	reverse_proxy backend:8000
+	request_body {
+		max_size 25MB
+	}
+}

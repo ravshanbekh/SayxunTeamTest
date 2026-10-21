@@ -1,12 +1,18 @@
+# Telegram bot (aiogram) - build konteksti: repozitoriy ildizi
 FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    TZ=Asia/Tashkent
 
 WORKDIR /app
 
-# Install dependencies
 COPY bot/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install -r requirements.txt
 
-# Copy bot code
 COPY bot/ .
+RUN rm -f .env && useradd --create-home --uid 1000 appuser && chown -R appuser:appuser /app
+USER appuser
 
 CMD ["python", "bot.py"]

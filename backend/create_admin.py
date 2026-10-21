@@ -1,23 +1,44 @@
 """
-Simple script to create an admin user
+Admin foydalanuvchi yaratish.
+
+Docker:  docker compose exec backend python create_admin.py <login>
+         (parol so'raladi; yoki ADMIN_PASSWORD muhit o'zgaruvchisi orqali)
 """
+import argparse
 import asyncio
-from app.database import AsyncSessionLocal
-from app.services.auth_service import AuthService
+import getpass
+import os
+import sys
+
+from sqlalchemy import select
+
+from app.database import AsyncSessionLocal, init_db
+from app.models import user, admin, test, session, result  # noqa: F401 - modellarni ro'yxatdan o'tkazish
+from app.models.admin import AdminUser
+from app.schemas.admin import AdminCreate
+from app.services.auth_service import create_admin
 
 
-async def create_admin():
+async def main(username: str, password: str, role: str) -> int:
+    await init_db()
     async with AsyncSessionLocal() as db:
-        try:
-            admin = await AuthService.create_admin_user(db, "admin", "admin123")
-            await db.commit()
-            print(f"✓ Admin user created: {admin.username}")
-            print(f"  Username: admin")
-            print(f"  Password: admin123")
-        except Exception as e:
-            print(f"✗ Error: {e}")
-            print("  Admin might already exist - try logging in!")
+        existing = (await db.execute(select(AdminUser).where(AdminUser.username == username))).scalars().first()
+        if existing:
+            print(f"✗ '{username}' nomli admin allaqachon mavjud")
+            return 1
+        created = await create_admin(db, AdminCreate(username=username, password=password, role=role))
+        print(f"✓ Admin yaratildi: {created.username}")
+        return 0
 
 
 if __name__ == "__main__":
-    asyncio.run(create_admin())
+    parser = argparse.ArgumentParser(description="Admin foydalanuvchi yaratish")
+    parser.add_argument("username", nargs="?", default=os.getenv("ADMIN_USERNAME", "admin"))
+    parser.add_argument("--role", default="admin")
+    args = parser.parse_args()
+
+    password = os.getenv("ADMIN_PASSWORD") or getpass.getpass("Parol (kamida 6 belgi): ")
+    if len(password) < 6:
+        print("✗ Parol kamida 6 belgidan iborat bo'lishi kerak")
+        sys.exit(1)
+    sys.exit(asyncio.run(main(args.username, password, args.role)))

@@ -1,0 +1,11 @@
+.git
+**/__pycache__
+**/*.pyc
+**/.env
+**/*.db
+**/.pytest_cache
+backend/tests
+backend/exports
+backend/uploads
+backups
+*.md

@@ -42,3 +42,6 @@ ENV/
 # OS
 Thumbs.db
 Desktop.ini
+
+# Server zaxiralari
+backups/
