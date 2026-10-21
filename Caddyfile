@@ -1,5 +1,13 @@
 # Caddy avtomatik ravishda Let's Encrypt HTTPS sertifikatini oladi va yangilaydi.
 # DOMAIN .env faylida beriladi (masalan: test.example.uz)
+{
+	servers {
+		# HTTP/3 (QUIC, UDP) o'chirilgan: ba'zi provayderlarda UDP sekinlashtirilgani
+		# sababli fayllar sekin yuklanishi yoki uzilib qolishi mumkin. Faqat HTTP/1.1 va HTTP/2.
+		protocols h1 h2
+	}
+}
+
 {$DOMAIN} {
 	encode gzip
 	reverse_proxy backend:8000

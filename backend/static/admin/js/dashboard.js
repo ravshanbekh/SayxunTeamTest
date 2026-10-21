@@ -147,10 +147,10 @@ function buildTestCard(test) {
             <span class="action-group-label">Natijalar</span>
             <div class="test-card-actions">
                 ${isSertifikat ? `
-                <button class="btn is-strong" onclick="exportRasch('${id}', 'pdf')">${icon('award')} Rasch natija · PDF</button>
-                <button class="btn" onclick="exportRasch('${id}', 'excel')">${icon('award')} Rasch natija · Excel</button>` : ''}
-                <button class="btn" onclick="exportExcel('${id}')">${icon('sheet')} Javoblar jadvali · Excel</button>
-                <button class="btn" onclick="exportPDF('${id}')">${icon('file')} Javoblar jadvali · PDF</button>
+                <button class="btn is-strong" onclick="exportRasch('${id}', 'pdf', this)">${icon('award')} Rasch natija · PDF</button>
+                <button class="btn" onclick="exportRasch('${id}', 'excel', this)">${icon('award')} Rasch natija · Excel</button>` : ''}
+                <button class="btn" onclick="exportExcel('${id}', this)">${icon('sheet')} Javoblar jadvali · Excel</button>
+                <button class="btn" onclick="exportPDF('${id}', this)">${icon('file')} Javoblar jadvali · PDF</button>
             </div>
         </div>`;
 
@@ -158,7 +158,7 @@ function buildTestCard(test) {
         <div class="action-group">
             <span class="action-group-label">Offline</span>
             <div class="test-card-actions">
-                <button class="btn" onclick="downloadOfflineTemplate('${id}')">${icon('download')} Shablonni yuklab olish</button>
+                <button class="btn" onclick="downloadOfflineTemplate('${id}', this)">${icon('download')} Shablonni yuklab olish</button>
                 <button class="btn" onclick="uploadOfflineResults('${id}')">${icon('upload')} Natijalarni yuklash</button>
                 <button class="btn" onclick="manageOfflineResults('${id}')">${icon('list')} Yuklanganlar</button>
             </div>
@@ -241,73 +241,89 @@ async function loadPrezidentTests() {
 // ==========================================
 // EXPORT / DELETE / EXTEND (shared)
 // ==========================================
-async function exportExcel(testId) {
+// Fayl yuklab olish: fetch -> blob -> vaqtinchalik havola.
+// Havola darhol o'chirilmaydi (katta fayllarda, masalan Rasch PDF, yuklash uzilib qolardi).
+const pendingDownloads = new Set();
+
+async function downloadFile(path, filename, button) {
+    if (pendingDownloads.has(path)) return;
+    pendingDownloads.add(path);
+    const originalHtml = button ? button.innerHTML : null;
+    if (button) {
+        button.disabled = true;
+        button.classList.add('is-busy');
+        button.innerHTML = `${icon('clock')} Tayyorlanmoqda…`;
+    }
     try {
-        const response = await fetch(`${API_BASE}/api/v1/admin/reports/${testId}/excel`, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` }
+        const response = await fetch(`${API_BASE}${path}`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` },
+            cache: 'no-store'
         });
-        if (!response.ok) throw new Error('Yuklab olishda xatolik');
+        if (response.status === 401) {
+            localStorage.removeItem('adminToken');
+            showLoginPage();
+            throw new Error('Sessiya tugagan, qaytadan kiring');
+        }
+        if (!response.ok) {
+            let message = `Server xatoligi (${response.status})`;
+            try {
+                const data = await response.json();
+                if (typeof data.detail === 'string') message = data.detail;
+            } catch (e) { /* JSON emas */ }
+            throw new Error(message);
+        }
         const blob = await response.blob();
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url; a.download = 'test_results.xlsx'; a.click();
-        URL.revokeObjectURL(url);
-    } catch (error) {
-        alert('Excel export xatolik: ' + error.message);
+        a.href = url;
+        a.download = filename;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } finally {
+        pendingDownloads.delete(path);
+        if (button) {
+            button.disabled = false;
+            button.classList.remove('is-busy');
+            button.innerHTML = originalHtml;
+        }
     }
 }
 
-async function exportPDF(testId) {
+async function exportExcel(testId, button) {
     try {
-        const response = await fetch(`${API_BASE}/api/v1/admin/reports/${testId}/pdf`, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` }
-        });
-        if (!response.ok) throw new Error('Yuklab olishda xatolik');
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = 'test_results.pdf'; a.click();
-        URL.revokeObjectURL(url);
+        await downloadFile(`/api/v1/admin/reports/${testId}/excel`, 'javoblar_jadvali.xlsx', button);
     } catch (error) {
-        alert('PDF export xatolik: ' + error.message);
+        alert('Excel yuklab olinmadi: ' + error.message);
+    }
+}
+
+async function exportPDF(testId, button) {
+    try {
+        await downloadFile(`/api/v1/admin/reports/${testId}/pdf`, 'javoblar_jadvali.pdf', button);
+    } catch (error) {
+        alert('PDF yuklab olinmadi: ' + error.message);
     }
 }
 
 // Rasch modeli asosidagi milliy sertifikat uslubidagi natijalar
-async function exportRasch(testId, format) {
+async function exportRasch(testId, format, button) {
     try {
-        const response = await fetch(`${API_BASE}/api/v1/admin/reports/${testId}/rasch/${format}`, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` }
-        });
-        if (!response.ok) throw new Error('Yuklab olishda xatolik');
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = format === 'pdf' ? 'rasch_natijalar.pdf' : 'rasch_natijalar.xlsx'; a.click();
-        URL.revokeObjectURL(url);
+        const filename = format === 'pdf' ? 'rasch_natijalar.pdf' : 'rasch_natijalar.xlsx';
+        await downloadFile(`/api/v1/admin/reports/${testId}/rasch/${format}`, filename, button);
     } catch (error) {
-        alert('Rasch natija xatolik: ' + error.message);
+        alert('Rasch natija yuklab olinmadi: ' + error.message);
     }
 }
 
 // ==========================================
 // OFFLINE NATIJALAR (Excel 0/1)
 // ==========================================
-async function downloadBlob(url, filename) {
-    const response = await fetch(`${API_BASE}${url}`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` }
-    });
-    if (!response.ok) throw new Error('Yuklab olishda xatolik');
-    const blob = await response.blob();
-    const link = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = link; a.download = filename; a.click();
-    URL.revokeObjectURL(link);
-}
-
-async function downloadOfflineTemplate(testId) {
+async function downloadOfflineTemplate(testId, button) {
     try {
-        await downloadBlob(`/api/v1/admin/tests/${testId}/offline/template`, 'offline_shablon.xlsx');
+        await downloadFile(`/api/v1/admin/tests/${testId}/offline/template`, 'offline_shablon.xlsx', button);
     } catch (error) {
         alert('Shablon xatolik: ' + error.message);
     }

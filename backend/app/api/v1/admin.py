@@ -2,6 +2,7 @@
 Admin endpoints - grading, student management, and exports.
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Response, UploadFile, File
+from starlette.concurrency import run_in_threadpool
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from uuid import UUID
@@ -223,7 +224,8 @@ async def export_rasch_pdf(
 
     report = await _rasch_report_or_404(db, test_id)
     filepath = os.path.join(settings.EXPORT_DIR, f"test_{test_id}_rasch.pdf")
-    export_rasch_to_pdf(report, filepath)
+    # PDF chizish CPU talab qiladi - boshqa so'rovlarni to'xtatmasligi uchun alohida oqimda
+    await run_in_threadpool(export_rasch_to_pdf, report, filepath)
 
     with open(filepath, "rb") as f:
         content = f.read()
@@ -248,7 +250,7 @@ async def export_rasch_excel(
 
     report = await _rasch_report_or_404(db, test_id)
     filepath = os.path.join(settings.EXPORT_DIR, f"test_{test_id}_rasch.xlsx")
-    export_rasch_to_excel(report, filepath)
+    await run_in_threadpool(export_rasch_to_excel, report, filepath)
 
     with open(filepath, "rb") as f:
         content = f.read()
@@ -285,7 +287,7 @@ async def download_offline_template(
     from app.services.offline_service import build_template
 
     test = await _test_or_404(db, test_id)
-    content = build_template(test, test.test_type or "sertifikat")
+    content = await run_in_threadpool(build_template, test, test.test_type or "sertifikat")
     return Response(
         content=content,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

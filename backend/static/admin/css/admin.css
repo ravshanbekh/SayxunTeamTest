@@ -167,6 +167,12 @@ body {
     border-color: var(--signal);
 }
 
+.btn.is-busy,
+.btn:disabled {
+    opacity: 0.75;
+    cursor: progress;
+}
+
 .btn-block {
     width: 100%;
 }
