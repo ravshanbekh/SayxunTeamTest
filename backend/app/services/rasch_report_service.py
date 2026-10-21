@@ -20,7 +20,8 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.platypus import (BaseDocTemplate, Frame, PageTemplate, NextPageTemplate,
+                                Table, TableStyle, Paragraph, Spacer)
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -35,8 +36,13 @@ logger = logging.getLogger(__name__)
 
 
 # Rasmdagi jadval ranglari
-HEADER_COLOR = "#ADD8E6"
-GRID_COLOR = "#9E8FC8"
+# Sayxun Team brend ranglari
+BRAND_DARK = "#20242C"
+BRAND_ORANGE = "#F58213"
+BRAND_ORANGE_TINT = "#FFF1E3"
+BRAND_MUTED = "#667085"
+HEADER_COLOR = BRAND_DARK
+GRID_COLOR = "#D0D5DD"
 GRADE_COLORS = {
     "A+": "#90EE90",
     "A": "#ADFF2F",
@@ -44,7 +50,7 @@ GRADE_COLORS = {
     "B": "#FFDAB9",
     "C+": "#FFE699",
     "C": "#FFFACD",
-    None: "#E8EEF7",
+    None: "#F2F4F7",
 }
 
 HEADERS = ["№", "Ism familiya", "To'g'ri", "Rash", "Foiz", "Daraja", "1-Fan", "2-Fan"]
@@ -263,36 +269,135 @@ def _pdf_safe(text: str) -> str:
     return result or "-"
 
 
+BRAND_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "brand")
+
+
+def _brand_image(name: str) -> Optional[str]:
+    path = os.path.join(BRAND_DIR, name)
+    return path if os.path.exists(path) else None
+
+
 def export_rasch_to_pdf(report: RaschReport, filepath: str) -> str:
     regular, bold = _register_fonts()
     os.makedirs(os.path.dirname(filepath) or ".", exist_ok=True)
 
-    doc = SimpleDocTemplate(
+    page_w, page_h = A4
+    margin = 0.55 * inch
+    first_band = 92      # birinchi sahifadagi logotipli sarlavha
+    later_band = 40      # keyingi sahifalardagi ingichka sarlavha
+    footer_h = 30
+    logo_path = _brand_image("logo.png")
+    watermark_path = _brand_image("watermark.png")
+    title_text = _pdf_safe(f"{report.test.title}")
+    generated = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    def draw_footer(canvas, doc):
+        canvas.setStrokeColor(colors.HexColor(BRAND_ORANGE))
+        canvas.setLineWidth(1.2)
+        canvas.line(margin, footer_h, page_w - margin, footer_h)
+        canvas.setFont(regular, 7.5)
+        canvas.setFillColor(colors.HexColor(BRAND_MUTED))
+        canvas.drawString(margin, footer_h - 12, "Sayxun Team o'quv markazi · Rasch natijalari")
+        canvas.drawRightString(page_w - margin, footer_h - 12, f"{doc.page}-bet")
+
+    def draw_watermark(canvas):
+        # Kontent ustidan juda xira chiziladi: rangli qatorlar ostida ham ko'rinadi
+        if not watermark_path:
+            return
+        w = page_w * 0.78
+        h = w * 0.29
+        canvas.drawImage(watermark_path, (page_w - w) / 2, (page_h - h) / 2 - 20, width=w, height=h,
+                         mask="auto", preserveAspectRatio=True)
+
+    def first_page(canvas, doc):
+        canvas.saveState()
+        canvas.setFillColor(colors.HexColor(BRAND_DARK))
+        canvas.rect(0, page_h - first_band, page_w, first_band, stroke=0, fill=1)
+        canvas.setFillColor(colors.HexColor(BRAND_ORANGE))
+        canvas.rect(0, page_h - first_band - 3, page_w, 3, stroke=0, fill=1)
+        if logo_path:
+            canvas.drawImage(logo_path, margin, page_h - first_band + 14, width=136, height=64,
+                             mask="auto", preserveAspectRatio=True, anchor="w")
+        canvas.setFillColor(colors.white)
+        canvas.setFont(bold, 15)
+        canvas.drawRightString(page_w - margin, page_h - 40, "Rasch natijalari")
+        canvas.setFont(regular, 9.5)
+        canvas.setFillColor(colors.HexColor("#F7B26A"))
+        canvas.drawRightString(page_w - margin, page_h - 56, title_text[:70])
+        canvas.setFillColor(colors.HexColor("#C9CED6"))
+        canvas.setFont(regular, 8)
+        canvas.drawRightString(page_w - margin, page_h - 70, "Milliy sertifikat uslubida baholash")
+        draw_footer(canvas, doc)
+        canvas.restoreState()
+
+    def later_page(canvas, doc):
+        canvas.saveState()
+        canvas.setFillColor(colors.HexColor(BRAND_DARK))
+        canvas.rect(0, page_h - later_band, page_w, later_band, stroke=0, fill=1)
+        canvas.setFillColor(colors.HexColor(BRAND_ORANGE))
+        canvas.rect(0, page_h - later_band - 2, page_w, 2, stroke=0, fill=1)
+        if logo_path:
+            canvas.drawImage(logo_path, margin, page_h - later_band + 6, width=62, height=28,
+                             mask="auto", preserveAspectRatio=True, anchor="w")
+        canvas.setFillColor(colors.white)
+        canvas.setFont(regular, 8.5)
+        canvas.drawRightString(page_w - margin, page_h - 24, f"{title_text[:60]} — Rasch natijalari")
+        draw_footer(canvas, doc)
+        canvas.restoreState()
+
+    def page_end(canvas, doc):
+        canvas.saveState()
+        draw_watermark(canvas)
+        canvas.restoreState()
+
+    doc = BaseDocTemplate(
         filepath, pagesize=A4,
-        leftMargin=0.55 * inch, rightMargin=0.55 * inch,
-        topMargin=0.5 * inch, bottomMargin=0.5 * inch,
         title=f"{report.test.title} - Rasch natijalari",
+        author="Sayxun Team o'quv markazi",
     )
+    frame_w = page_w - 2 * margin
+    first_frame = Frame(margin, footer_h + 10, frame_w, page_h - first_band - footer_h - 26, id="first",
+                        leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)
+    later_frame = Frame(margin, footer_h + 10, frame_w, page_h - later_band - footer_h - 24, id="later",
+                        leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)
+    doc.addPageTemplates([
+        PageTemplate(id="First", frames=[first_frame], onPage=first_page, onPageEnd=page_end),
+        PageTemplate(id="Later", frames=[later_frame], onPage=later_page, onPageEnd=page_end),
+    ])
+
     styles = getSampleStyleSheet()
-    title_style = ParagraphStyle("RaschTitle", parent=styles["Heading2"], fontName=bold,
-                                 fontSize=13, alignment=1, spaceAfter=4)
-    info_style = ParagraphStyle("RaschInfo", parent=styles["Normal"], fontName=regular,
-                                fontSize=8, textColor=colors.HexColor("#555555"), alignment=1)
     note_style = ParagraphStyle("RaschNote", parent=styles["Normal"], fontName=regular,
-                                fontSize=7, textColor=colors.HexColor("#555555"), leading=9)
+                                fontSize=7, textColor=colors.HexColor(BRAND_MUTED), leading=9.5)
+    section_style = ParagraphStyle("RaschSection", parent=styles["Normal"], fontName=bold,
+                                   fontSize=9.5, textColor=colors.HexColor(BRAND_DARK), spaceAfter=6)
 
     analysis = report.analysis
-    elements = [
-        Paragraph(_pdf_safe(f"{report.test.title} — Rasch natijalari"), title_style),
-        Paragraph(
-            f"Kod: {report.test.test_code} | Ishtirokchilar: {len(report.rows)} "
-            f"(onlayn: {report.source_counts()['online']}, offline: {report.source_counts()['offline']}) | "
-            f"Topshiriqlar: {len(report.item_labels)} | "
-            f"Sana: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
-            info_style,
-        ),
-        Spacer(1, 0.12 * inch),
+    sources = report.source_counts()
+
+    # Asosiy ma'lumotlar: yorliq + qiymat
+    facts = [
+        ("Test kodi", _pdf_safe(str(report.test.test_code))),
+        ("Ishtirokchilar", f"{len(report.rows)}  (onlayn {sources['online']}, offline {sources['offline']})"),
+        ("Topshiriqlar", str(len(report.item_labels))),
+        ("Sana", generated),
     ]
+    facts_table = Table([[f[0] for f in facts], [f[1] for f in facts]],
+                        colWidths=[70, 190, 70, frame_w - 330])
+    facts_table.setStyle(TableStyle([
+        ("FONTNAME", (0, 0), (-1, 0), regular),
+        ("FONTNAME", (0, 1), (-1, 1), bold),
+        ("FONTSIZE", (0, 0), (-1, 0), 7),
+        ("FONTSIZE", (0, 1), (-1, 1), 9),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor(BRAND_MUTED)),
+        ("TEXTCOLOR", (0, 1), (-1, 1), colors.HexColor(BRAND_DARK)),
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor(BRAND_ORANGE_TINT)),
+        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ("TOPPADDING", (0, 0), (-1, 0), 6),
+        ("BOTTOMPADDING", (0, 1), (-1, 1), 7),
+        ("BOTTOMPADDING", (0, 0), (-1, 0), 0),
+    ]))
+
+    elements = [NextPageTemplate("Later"), facts_table, Spacer(1, 12)]
 
     data = [HEADERS] + [
         [row[0], _pdf_safe(row[1])] + row[2:] for row in table_rows(report)
@@ -301,15 +406,20 @@ def export_rasch_to_pdf(report: RaschReport, filepath: str) -> str:
     table = Table(data, colWidths=col_widths, repeatRows=1)
 
     style = [
-        ("FONTNAME", (0, 0), (-1, 0), regular),
+        ("FONTNAME", (0, 0), (-1, 0), bold),
         ("FONTNAME", (0, 1), (-1, -1), regular),
         ("FONTSIZE", (0, 0), (-1, -1), 8),
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(HEADER_COLOR)),
-        ("GRID", (0, 0), (-1, -1), 0.6, colors.HexColor(GRID_COLOR)),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(BRAND_DARK)),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("LINEBELOW", (0, 0), (-1, 0), 1.5, colors.HexColor(BRAND_ORANGE)),
+        ("INNERGRID", (0, 1), (-1, -1), 0.6, colors.white),
+        ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor(GRID_COLOR)),
         ("ALIGN", (0, 0), (-1, -1), "LEFT"),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("TOPPADDING", (0, 0), (-1, -1), 2.5),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
+        ("TOPPADDING", (0, 0), (-1, 0), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, 0), 5),
         ("LEFTPADDING", (0, 0), (-1, -1), 4),
     ]
     for i, row in enumerate(report.rows, 1):
@@ -319,17 +429,22 @@ def export_rasch_to_pdf(report: RaschReport, filepath: str) -> str:
 
     # Darajalar bo'yicha qisqa statistika
     counts = report.grade_counts()
-    elements.append(Spacer(1, 0.18 * inch))
-    summary = [["Daraja"] + list(counts.keys()), ["Soni"] + [str(v) for v in counts.values()]]
-    summary_table = Table(summary, colWidths=[50] + [40] * len(counts))
+    elements.append(Spacer(1, 16))
+    elements.append(Paragraph("Darajalar bo'yicha taqsimot", section_style))
+    summary = [list(counts.keys()), [str(v) for v in counts.values()]]
+    summary_table = Table(summary, colWidths=[46] * len(counts))
     summary_style = [
-        ("FONTNAME", (0, 0), (-1, -1), regular),
-        ("FONTSIZE", (0, 0), (-1, -1), 8),
-        ("GRID", (0, 0), (-1, -1), 0.6, colors.HexColor(GRID_COLOR)),
-        ("BACKGROUND", (0, 0), (0, -1), colors.HexColor(HEADER_COLOR)),
+        ("FONTNAME", (0, 0), (-1, 0), bold),
+        ("FONTNAME", (0, 1), (-1, 1), regular),
+        ("FONTSIZE", (0, 0), (-1, -1), 8.5),
+        ("INNERGRID", (0, 0), (-1, -1), 0.6, colors.white),
+        ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor(GRID_COLOR)),
+        ("BACKGROUND", (0, 1), (-1, 1), colors.white),
         ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
     ]
-    for col, grade in enumerate(counts.keys(), 1):
+    for col, grade in enumerate(counts.keys()):
         color = GRADE_COLORS.get(None if grade == "-" else grade)
         summary_style.append(("BACKGROUND", (col, 0), (col, 0), colors.HexColor(color)))
     summary_table.setStyle(TableStyle(summary_style))
@@ -337,7 +452,7 @@ def export_rasch_to_pdf(report: RaschReport, filepath: str) -> str:
     elements.append(summary_table)
 
     rel = f"{analysis.reliability:.2f}" if analysis.reliability is not None else "-"
-    elements.append(Spacer(1, 0.1 * inch))
+    elements.append(Spacer(1, 10))
     elements.append(Paragraph(
         "Ballar Rasch modeli (CML + WLE) asosida hisoblangan: T = 50 + 10·Z (shartli maksimal 75, undan yuqori ham bo'lishi mumkin). "
         "Darajalar: A+ ≥70, A ≥65, B+ ≥60, B ≥55, C+ ≥50, C ≥46. "
@@ -371,7 +486,7 @@ def export_rasch_to_excel(report: RaschReport, filepath: str) -> str:
     ws.append(HEADERS + ["Manba"])
     for cell in ws[1]:
         cell.fill = header_fill
-        cell.font = Font(bold=True)
+        cell.font = Font(bold=True, color="FFFFFF")
         cell.border = border
         cell.alignment = Alignment(horizontal="left", vertical="center")
 
@@ -403,7 +518,7 @@ def export_rasch_to_excel(report: RaschReport, filepath: str) -> str:
     ws2.append(["Savol", "To'g'ri javoblar", "Foiz", "Qiyinlik (logit)", "Izoh"])
     for cell in ws2[1]:
         cell.fill = header_fill
-        cell.font = Font(bold=True)
+        cell.font = Font(bold=True, color="FFFFFF")
         cell.border = border
     n = len(report.rows) or 1
     for label, item in zip(report.item_labels, report.analysis.items):
@@ -420,7 +535,7 @@ def export_rasch_to_excel(report: RaschReport, filepath: str) -> str:
     ws3.append(["№", "Ism familiya", "To'g'ri", "θ (logit)", "Rash"] + report.item_labels)
     for cell in ws3[1]:
         cell.fill = header_fill
-        cell.font = Font(bold=True)
+        cell.font = Font(bold=True, color="FFFFFF")
     for r in report.rows:
         ws3.append([r.rank, r.name, r.correct, round(r.theta, 4), r.score] + list(r.item_values))
     ws3.column_dimensions["B"].width = 30

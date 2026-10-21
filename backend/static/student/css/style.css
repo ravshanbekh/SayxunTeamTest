@@ -1,21 +1,24 @@
 /* ==========================================================================
    Javoblar varaqasi - talaba test sahifasi (Telegram Mini App)
-   Uslub: imtihonning rasmiy OMR blankasi - oq qog'oz, havorang bosma chiziqlar,
-   siyoh-ko'k bilan to'ldiriladigan doirachalar.
+   Sayxun Team brendi: grafit panel, to'q sariq bosma chiziqli OMR blanka,
+   tanlangan javob - to'q sariq doiracha.
    ========================================================================== */
 
 :root {
-    --paper: #F3F6FA;
+    --paper: #F7F8FA;
     --sheet: #FFFFFF;
-    --ink: #13233F;
-    --ink-soft: #4B5B76;
-    --form: #8FB0CF;
-    --form-line: #D3E0EC;
-    --form-tint: #EEF4FA;
-    --signal: #D7263D;
-    --signal-tint: #FCE9EB;
-    --pass: #1B8A57;
-    --pass-tint: #E2F3EA;
+    --ink: #20242C;
+    --ink-soft: #667085;
+    --form: #F2B47A;
+    --form-line: #F7DEC6;
+    --form-tint: #FFF6EC;
+    --accent: #F58213;
+    --accent-hover: #E27108;
+    --accent-tint: #FFF1E3;
+    --signal: #D43D51;
+    --signal-tint: #FCEBEE;
+    --pass: #16845B;
+    --pass-tint: #E6F4EE;
 
     --font-display: "Unbounded", "Golos Text", system-ui, sans-serif;
     --font-text: "Golos Text", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -89,22 +92,10 @@ body {
     text-overflow: ellipsis;
 }
 
-.brand-dots {
-    display: inline-flex;
-    gap: 3px;
+.brand-emblem {
+    width: 46px;
+    height: auto;
     flex-shrink: 0;
-}
-
-.brand-dots i {
-    width: 9px;
-    height: 9px;
-    border-radius: 50%;
-    border: 1.5px solid var(--form);
-}
-
-.brand-dots i:nth-child(2) {
-    background: #fff;
-    border-color: #fff;
 }
 
 .exam-timer {
@@ -149,7 +140,7 @@ body {
 .exam-progress-fill {
     height: 100%;
     width: 0;
-    background: var(--form);
+    background: var(--accent);
     transition: width 0.25s ease;
 }
 
@@ -169,7 +160,7 @@ body {
 }
 
 .timer-warning {
-    color: #FFB4BC;
+    color: #FFB3BD;
     font-weight: 600;
 }
 
@@ -274,7 +265,7 @@ body {
     border-radius: 50%;
     border: 1.5px solid var(--form);
     background: var(--sheet);
-    color: var(--form);
+    color: var(--accent-hover);
     font-family: var(--font-text);
     font-weight: 600;
     font-size: 14px;
@@ -284,8 +275,8 @@ body {
 }
 
 .option-btn:hover:not(:disabled) {
-    border-color: var(--ink);
-    color: var(--ink);
+    border-color: var(--accent);
+    background: var(--accent-tint);
 }
 
 .option-btn:active:not(:disabled) {
@@ -294,14 +285,14 @@ body {
 
 .option-btn.selected,
 .option-btn.selected:hover:not(:disabled) {
-    background: var(--ink);
-    border-color: var(--ink);
-    color: #fff;
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--ink);
 }
 
 .option-btn:focus-visible,
 .submit-btn:focus-visible {
-    outline: 3px solid var(--form);
+    outline: 3px solid rgba(245, 130, 19, 0.45);
     outline-offset: 2px;
 }
 
@@ -378,15 +369,15 @@ math-field.math-input {
     display: block;
     background: var(--form-tint);
     color: var(--ink);
-    --caret-color: var(--ink);
-    --selection-background-color: rgba(143, 176, 207, 0.35);
+    --caret-color: var(--accent);
+    --selection-background-color: rgba(245, 130, 19, 0.25);
     --contains-highlight-background-color: transparent;
     transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
 math-field.math-input:focus-within {
     outline: none;
-    border-color: var(--ink);
+    border-color: var(--accent);
     background: var(--sheet);
 }
 
@@ -412,8 +403,8 @@ body {
     min-height: 54px;
     border: none;
     border-radius: 999px;
-    background: var(--ink);
-    color: #fff;
+    background: var(--accent);
+    color: var(--ink);
     font-family: var(--font-display);
     font-weight: 500;
     font-size: 17px;
@@ -422,7 +413,7 @@ body {
 }
 
 .submit-btn:hover:not(:disabled) {
-    background: #1D3460;
+    background: var(--accent-hover);
 }
 
 .submit-btn:active:not(:disabled) {
@@ -430,7 +421,7 @@ body {
 }
 
 .submit-btn:disabled {
-    background: var(--form);
+    background: #D0D5DD;
     cursor: not-allowed;
 }
 
@@ -446,7 +437,7 @@ body {
 .loading-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(243, 246, 250, 0.92);
+    background: rgba(247, 248, 250, 0.92);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -479,7 +470,7 @@ body {
 
 @keyframes bubble-fill {
     0%, 100% { background: transparent; border-color: var(--form); }
-    40% { background: var(--ink); border-color: var(--ink); }
+    40% { background: var(--accent); border-color: var(--accent); }
 }
 
 /* --------------------------------------------------------------------------
@@ -530,7 +521,7 @@ body {
     display: grid;
     grid-auto-flow: column;
     grid-auto-columns: 1fr;
-    border: 1.5px solid var(--form);
+    border: 1px solid #E4E7EC;
     border-radius: var(--radius-sheet);
     background: var(--sheet);
     overflow: hidden;
@@ -572,6 +563,10 @@ body {
 
 .score-total .score-label {
     color: rgba(255, 255, 255, 0.72);
+}
+
+.score-total .score-value {
+    color: var(--accent);
 }
 
 .results-section {
@@ -678,7 +673,7 @@ body {
     margin-top: 28px;
     padding: 14px 16px;
     border-radius: var(--radius-sheet);
-    background: var(--form-tint);
+    background: var(--accent-tint);
     color: var(--ink-soft);
     font-size: 14px;
     max-width: 62ch;

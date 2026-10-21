@@ -63,12 +63,16 @@ async function loadDashboard() {
         ]);
         const active = [...sertifikat, ...prezident].filter(t => t.is_active).length;
 
-        document.getElementById('stats').innerHTML = `
-            <div class="stat-card"><h3>Ro'yxatdan o'tgan talabalar</h3><p class="stat-number">${students.length}</p></div>
-            <div class="stat-card"><h3>Sertifikat testlari</h3><p class="stat-number">${sertifikat.length}</p></div>
-            <div class="stat-card"><h3>Prezident maktabi testlari</h3><p class="stat-number">${prezident.length}</p></div>
-            <div class="stat-card"><h3>Hozir faol testlar</h3><p class="stat-number">${active}</p></div>
-        `;
+        const stat = (img, label, value) => `
+            <div class="stat-card">
+                <img class="illus" src="../brand/${img}.webp" alt="">
+                <div><h3>${label}</h3><p class="stat-number">${value}</p></div>
+            </div>`;
+        document.getElementById('stats').innerHTML =
+            stat('icon-students', "Ro'yxatdan o'tgan talabalar", students.length) +
+            stat('icon-certificate', 'Sertifikat testlari', sertifikat.length) +
+            stat('icon-school', 'Prezident maktabi testlari', prezident.length) +
+            stat('icon-exam', 'Hozir faol testlar', active);
         document.getElementById('recent-tests').innerHTML = `
             <h2>Imtihon qanday o'tkaziladi</h2>
             <ol class="steps">
@@ -198,6 +202,7 @@ function renderTestList(tests, containerId, createButtonId) {
     if (!tests.length) {
         container.innerHTML = `
             <div class="empty-state">
+                <img class="illus" src="../brand/${containerId === 'prezident-list' ? 'icon-school' : 'icon-certificate'}.webp" alt="">
                 <h3>Hali test yo'q</h3>
                 <p>Javoblar kalitini kiritib birinchi testni yarating. Kodini talabalarga bersangiz, ular botda testni boshlay oladi.</p>
                 <button class="btn-primary" onclick="document.getElementById('${createButtonId}').click()">${icon('plus')} Yangi test</button>

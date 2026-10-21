@@ -5,21 +5,31 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sayxun Team — Admin</title>
+    <link rel="icon" type="image/png" href="../brand/favicon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=Unbounded:wght@500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/admin.css?v=6">
+    <link rel="stylesheet" href="css/admin.css?v=7">
 </head>
 
 <body>
     <!-- Kirish -->
     <div class="login-container" id="login-page">
-        <div class="login-card">
-            <div class="brand brand-login">
-                <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
-                <span class="brand-text"><b>Sayxun Team</b><small>Test platformasi</small></span>
+        <section class="login-hero">
+            <img class="brand-logo" src="../brand/logo.webp" alt="Sayxun Team o'quv markazi">
+            <p>Milliy sertifikat uslubidagi sinov imtihonlari: test yaratish, onlayn va offline natijalar,
+               Rasch bo'yicha baholash.</p>
+            <div class="login-hero-icons" aria-hidden="true">
+                <img class="illus" src="../brand/icon-certificate.webp" alt="">
+                <img class="illus" src="../brand/icon-exam.webp" alt="">
+                <img class="illus" src="../brand/icon-students.webp" alt="">
+                <img class="illus" src="../brand/icon-school.webp" alt="">
             </div>
+        </section>
+        <div class="login-side">
+        <div class="login-card">
             <h1>Admin panelga kirish</h1>
+            <p>O'quv markazi tomonidan berilgan login va parolni kiriting.</p>
             <form id="login-form">
                 <div class="form-group">
                     <label for="username">Login</label>
@@ -32,13 +42,14 @@
                 <button type="submit" class="btn-primary btn-block">Kirish</button>
             </form>
         </div>
+        </div>
     </div>
 
     <div class="admin-container hidden" id="admin-panel">
         <nav class="sidebar" aria-label="Asosiy menyu">
             <div class="brand">
-                <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
-                <span class="brand-text"><b>Sayxun Team</b><small>Test platformasi</small></span>
+                <img class="brand-logo" src="../brand/logo.webp" alt="Sayxun Team o'quv markazi">
+                <img class="brand-emblem" src="../brand/emblem.webp" alt="Sayxun Team">
             </div>
             <ul class="menu">
                 <li><a href="#" data-page="dashboard" class="active">
@@ -75,9 +86,12 @@
             <!-- Sertifikat testlari -->
             <div class="page" id="tests-page">
                 <header class="page-head">
-                    <div>
+                    <div class="page-title">
+                        <img class="illus" src="../brand/icon-certificate.webp" alt="">
+                        <div>
                         <h1>Sertifikat testlari</h1>
                         <p>35 ta yopiq va 10 ta yozma savol. Natijalar milliy sertifikat uslubida Rasch bo'yicha hisoblanadi.</p>
+                        </div>
                     </div>
                     <button class="btn-primary" id="create-test-btn">
                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
@@ -89,9 +103,12 @@
             <!-- Prezident maktabi testlari -->
             <div class="page" id="prezident-page">
                 <header class="page-head">
-                    <div>
+                    <div class="page-title">
+                        <img class="illus" src="../brand/icon-school.webp" alt="">
+                        <div>
                         <h1>Prezident maktabi testlari</h1>
                         <p>40 ta yopiq savol, har birida 4 ta variant.</p>
+                        </div>
                     </div>
                     <button class="btn-primary" id="create-prezident-btn">
                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
@@ -103,9 +120,12 @@
             <!-- Adminlar -->
             <div class="page" id="admins-page">
                 <header class="page-head">
-                    <div>
+                    <div class="page-title">
+                        <img class="illus" src="../brand/icon-students.webp" alt="">
+                        <div>
                         <h1>Adminlar</h1>
                         <p>Admin panelga kira oladigan foydalanuvchilar.</p>
+                        </div>
                     </div>
                     <button class="btn-primary" id="add-admin-btn">
                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
@@ -307,7 +327,7 @@
 
     <script src="https://unpkg.com/mathlive"></script>
     <script src="js/auth.js?v=2"></script>
-    <script src="js/dashboard.js?v=5"></script>
+    <script src="js/dashboard.js?v=6"></script>
 </body>
 
 </html>

@@ -1,23 +1,26 @@
 /* ==========================================================================
-   Sayxun Team - admin panel
-   Talaba sahifasi bilan bitta tizim: siyoh-ko'k (ink), blanka havorangi (form),
-   oq qog'oz. Testlar kartochka emas, ro'yxat ("jurnal") ko'rinishida.
+   Sayxun Team o'quv markazi - admin panel
+   Brend ranglari: grafit (#20242C) yon menyu va sarlavhalar, to'q sariq (#F58213)
+   asosiy tugma va tanlangan element, och fon (#F7F8FA), oq kartalar.
    ========================================================================== */
 
 :root {
-    --paper: #F3F6FA;
+    --paper: #F7F8FA;
     --sheet: #FFFFFF;
-    --ink: #13233F;
-    --ink-2: #1D3460;
-    --ink-soft: #4B5B76;
-    --muted: #7A889E;
-    --form: #8FB0CF;
-    --form-line: #D3E0EC;
-    --form-tint: #EEF4FA;
-    --signal: #D7263D;
-    --signal-tint: #FCE9EB;
-    --pass: #1B8A57;
-    --pass-tint: #E2F3EA;
+    --ink: #20242C;
+    --ink-2: #2E333D;
+    --ink-soft: #667085;
+    --muted: #8A94A6;
+    --form: #D0D5DD;
+    --form-line: #E4E7EC;
+    --form-tint: #F2F4F7;
+    --accent: #F58213;
+    --accent-hover: #E27108;
+    --accent-tint: #FFF1E3;
+    --signal: #D43D51;
+    --signal-tint: #FCEBEE;
+    --pass: #16845B;
+    --pass-tint: #E6F4EE;
 
     --font-display: "Unbounded", "Golos Text", system-ui, sans-serif;
     --font-text: "Golos Text", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -60,46 +63,30 @@ body {
 }
 
 /* --------------------------------------------------------------------------
-   Brend belgisi: blankadagi uchta doiracha, o'rtasi belgilangan
+   Brend: markaz logotipi va 3D ikonkalar
    -------------------------------------------------------------------------- */
 .brand {
-    display: flex;
-    align-items: center;
-    gap: 12px;
+    display: block;
 }
 
-.brand-mark {
-    display: inline-flex;
-    gap: 4px;
+.brand-logo {
+    display: block;
+    width: 100%;
+    max-width: 196px;
+    height: auto;
 }
 
-.brand-mark i {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    border: 2px solid var(--form);
+.brand-emblem {
+    display: none;
+    width: 52px;
+    height: auto;
 }
 
-.brand-mark i:nth-child(2) {
-    background: #fff;
-    border-color: #fff;
-}
-
-.brand-text {
-    display: flex;
-    flex-direction: column;
-    line-height: 1.2;
-}
-
-.brand-text b {
-    font-family: var(--font-display);
-    font-weight: 700;
-    font-size: 15px;
-}
-
-.brand-text small {
-    font-size: 12px;
-    opacity: 0.7;
+.illus {
+    width: 64px;
+    height: 64px;
+    flex-shrink: 0;
+    object-fit: contain;
 }
 
 /* --------------------------------------------------------------------------
@@ -125,14 +112,14 @@ body {
 }
 
 .btn-primary {
-    border: 1.5px solid var(--ink);
-    background: var(--ink);
-    color: #fff;
+    border: 1.5px solid var(--accent);
+    background: var(--accent);
+    color: var(--ink);
 }
 
 .btn-primary:hover {
-    background: var(--ink-2);
-    border-color: var(--ink-2);
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
 }
 
 .btn-secondary,
@@ -144,19 +131,31 @@ body {
 
 .btn-secondary:hover,
 .btn:hover {
-    border-color: var(--form);
-    background: var(--form-tint);
+    border-color: var(--accent);
+    background: var(--accent-tint);
+}
+
+.btn .icon {
+    color: var(--accent);
 }
 
 .btn.is-strong {
-    background: var(--ink);
-    border-color: var(--ink);
-    color: #fff;
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--ink);
+}
+
+.btn.is-strong .icon {
+    color: var(--ink);
 }
 
 .btn.is-strong:hover {
-    background: var(--ink-2);
-    border-color: var(--ink-2);
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+}
+
+.btn.is-danger .icon {
+    color: var(--signal);
 }
 
 .btn.is-danger {
@@ -177,7 +176,7 @@ a:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-    outline: 3px solid var(--form);
+    outline: 3px solid rgba(245, 130, 19, 0.45);
     outline-offset: 2px;
 }
 
@@ -231,7 +230,8 @@ textarea:focus-visible {
 .form-group input:focus,
 .form-group textarea:focus {
     outline: none;
-    border-color: var(--ink);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-tint);
 }
 
 .checkbox-label {
@@ -245,7 +245,7 @@ textarea:focus-visible {
 .checkbox-label input {
     width: 18px;
     height: 18px;
-    accent-color: var(--ink);
+    accent-color: var(--accent);
 }
 
 /* --------------------------------------------------------------------------
@@ -254,37 +254,66 @@ textarea:focus-visible {
 .login-container {
     min-height: 100vh;
     display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    background: var(--paper);
+}
+
+.login-hero {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 28px;
+    padding: 48px 56px;
+    background: var(--ink);
+    color: #fff;
+}
+
+.login-hero .brand-logo {
+    max-width: 380px;
+}
+
+.login-hero p {
+    max-width: 40ch;
+    color: rgba(255, 255, 255, 0.72);
+    font-size: 16px;
+}
+
+.login-hero-icons {
+    display: flex;
+    gap: 18px;
+}
+
+.login-hero-icons .illus {
+    width: 72px;
+    height: 72px;
+}
+
+.login-side {
+    display: grid;
     place-items: center;
-    padding: 24px 16px;
-    background:
-        repeating-linear-gradient(0deg, transparent 0 39px, var(--form-line) 39px 40px),
-        var(--paper);
+    padding: 32px 20px;
 }
 
 .login-card {
     width: 100%;
-    max-width: 400px;
-    background: var(--sheet);
-    border: 1.5px solid var(--form);
-    border-radius: var(--radius-sheet);
-    padding: 32px 28px;
+    max-width: 380px;
 }
 
-.brand-login .brand-mark i {
-    border-color: var(--form);
-}
-
-.brand-login .brand-mark i:nth-child(2) {
-    background: var(--ink);
-    border-color: var(--ink);
+.login-card .brand-emblem {
+    display: none;
 }
 
 .login-card h1 {
-    margin: 28px 0 20px;
+    margin-bottom: 6px;
     font-family: var(--font-display);
     font-weight: 700;
-    font-size: 22px;
+    font-size: 24px;
     line-height: 1.25;
+}
+
+.login-card > p {
+    margin-bottom: 24px;
+    color: var(--ink-soft);
 }
 
 /* --------------------------------------------------------------------------
@@ -309,7 +338,7 @@ textarea:focus-visible {
 }
 
 .sidebar .brand {
-    padding: 0 8px;
+    padding: 4px 8px 0;
 }
 
 .menu {
@@ -340,7 +369,12 @@ textarea:focus-visible {
 
 .menu a.active {
     color: var(--ink);
-    background: #fff;
+    background: var(--accent-tint);
+    font-weight: 600;
+}
+
+.menu a.active .icon {
+    color: var(--accent);
 }
 
 .logout {
@@ -365,10 +399,21 @@ textarea:focus-visible {
 
 .page-head {
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     justify-content: space-between;
     gap: 24px;
     margin-bottom: 24px;
+}
+
+.page-title {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.page-title .illus {
+    width: 60px;
+    height: 60px;
 }
 
 .page-head h1 {
@@ -390,20 +435,18 @@ textarea:focus-visible {
    -------------------------------------------------------------------------- */
 .stats-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    background: var(--sheet);
-    border: 1.5px solid var(--form);
-    border-radius: var(--radius-sheet);
-    overflow: hidden;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
 }
 
 .stat-card {
-    padding: 20px 22px;
-    border-right: 1px solid var(--form-line);
-}
-
-.stat-card:last-child {
-    border-right: none;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 18px 20px;
+    background: var(--sheet);
+    border: 1px solid var(--form-line);
+    border-radius: var(--radius-sheet);
 }
 
 .stat-card h3 {
@@ -413,10 +456,10 @@ textarea:focus-visible {
 }
 
 .stat-number {
-    margin-top: 4px;
+    margin-top: 2px;
     font-family: var(--font-display);
     font-weight: 700;
-    font-size: 34px;
+    font-size: 30px;
     line-height: 1.1;
     font-variant-numeric: tabular-nums;
 }
@@ -447,7 +490,7 @@ textarea:focus-visible {
     gap: 4px 12px;
     padding: 16px;
     background: var(--sheet);
-    border: 1.5px solid var(--form-line);
+    border: 1px solid var(--form-line);
     border-radius: var(--radius-sheet);
 }
 
@@ -457,13 +500,13 @@ textarea:focus-visible {
     width: 34px;
     height: 34px;
     border-radius: 50%;
-    border: 1.5px solid var(--form);
+    background: var(--accent-tint);
     display: grid;
     place-items: center;
     font-family: var(--font-display);
     font-weight: 500;
     font-size: 14px;
-    color: var(--ink);
+    color: var(--accent-hover);
 }
 
 .steps b {
@@ -482,7 +525,7 @@ textarea:focus-visible {
     display: flex;
     flex-direction: column;
     background: var(--sheet);
-    border: 1.5px solid var(--form);
+    border: 1px solid var(--form-line);
     border-radius: var(--radius-sheet);
     overflow: hidden;
 }
@@ -550,7 +593,7 @@ textarea:focus-visible {
 .test-code {
     padding: 1px 8px;
     border-radius: 6px;
-    background: var(--form-tint);
+    background: var(--accent-tint);
     color: var(--ink);
     font-weight: 600;
     letter-spacing: 0.04em;
@@ -633,6 +676,12 @@ textarea:focus-visible {
     border-radius: var(--radius-sheet);
 }
 
+.empty-state .illus {
+    width: 88px;
+    height: 88px;
+    margin-bottom: 8px;
+}
+
 .empty-state h3 {
     font-family: var(--font-display);
     font-weight: 500;
@@ -665,7 +714,7 @@ textarea:focus-visible {
     align-items: flex-start;
     justify-content: center;
     padding: 4vh 16px;
-    background: rgba(19, 35, 63, 0.55);
+    background: rgba(32, 36, 44, 0.6);
     overflow-y: auto;
 }
 
@@ -731,7 +780,7 @@ textarea:focus-visible {
 }
 
 .mcq-answer-input:focus-within {
-    border-color: var(--ink);
+    border-color: var(--accent);
 }
 
 .mcq-answer-input label {
@@ -749,7 +798,7 @@ textarea:focus-visible {
     height: 32px;
     border: none;
     border-radius: 8px;
-    background: var(--form-tint);
+    background: var(--accent-tint);
     color: var(--ink);
     font-family: var(--font-text);
     font-weight: 700;
@@ -804,14 +853,14 @@ math-field.admin-math-input {
     display: block;
     background: var(--form-tint);
     color: var(--ink);
-    --caret-color: var(--ink);
-    --selection-background-color: rgba(143, 176, 207, 0.35);
+    --caret-color: var(--accent);
+    --selection-background-color: rgba(245, 130, 19, 0.25);
     --contains-highlight-background-color: transparent;
 }
 
 math-field.admin-math-input:focus-within {
     outline: none;
-    border-color: var(--ink);
+    border-color: var(--accent);
     background: var(--sheet);
 }
 
@@ -823,6 +872,32 @@ math-field.admin-math-input:focus-within {
    Planshet va telefon
    -------------------------------------------------------------------------- */
 @media (max-width: 900px) {
+    .login-container {
+        grid-template-columns: 1fr;
+    }
+
+    .login-hero {
+        padding: 32px 24px;
+        gap: 18px;
+    }
+
+    .login-hero .brand-logo {
+        max-width: 240px;
+    }
+
+    .login-hero-icons .illus {
+        width: 52px;
+        height: 52px;
+    }
+
+    .sidebar .brand-logo {
+        display: none;
+    }
+
+    .sidebar .brand-emblem {
+        display: block;
+    }
+
     .sidebar {
         position: sticky;
         inset: auto;
@@ -833,10 +908,6 @@ math-field.admin-math-input:focus-within {
         gap: 8px;
         padding: 10px 12px;
         overflow-x: auto;
-    }
-
-    .sidebar .brand-text {
-        display: none;
     }
 
     .menu {
@@ -888,9 +959,19 @@ math-field.admin-math-input:focus-within {
         font-size: 23px;
     }
 
-    .stat-card {
-        border-right: none;
-        border-bottom: 1px solid var(--form-line);
+    .login-hero p,
+    .login-hero-icons {
+        display: none;
+    }
+
+    .page-title .illus {
+        width: 48px;
+        height: 48px;
+    }
+
+    .stat-card .illus {
+        width: 56px;
+        height: 56px;
     }
 
     .test-card {
