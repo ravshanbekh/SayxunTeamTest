@@ -13,6 +13,20 @@ Telegram Mini App (test sahifasi) faqat **HTTPS** orqali ochiladi, shuning uchun
 
 ---
 
+## Tezkor o'rnatish (bitta buyruq)
+
+Serverga `ssh root@SERVER_IP` bilan kiring va quyidagini ishga tushiring:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ravshanbekh/SayxunTeamTest/main/deploy/install.sh | bash
+```
+
+Skript Docker, firewall, loyiha va `.env` ni (parollarni avtomatik yaratib) sozlaydi, konteynerlarni ishga
+tushiradi, admin yaratadi va kunlik zaxirani yoqadi. Sizdan domen (bo'sh qoldirilsa `IP.sslip.io`),
+`BOT_TOKEN` va admin paroli so'raladi. Quyidagi bo'limlar xuddi shu ishni qo'lda bajarish uchun.
+
+---
+
 ## 1. Tayyorgarlik
 
 - Contabo VPS: Ubuntu 22.04 yoki 24.04 (2 vCPU / 4 GB RAM yetarli).
