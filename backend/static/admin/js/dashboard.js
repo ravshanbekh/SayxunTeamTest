@@ -36,10 +36,10 @@ if (window.mathVirtualKeyboard) {
 document.querySelectorAll('.menu a[data-page]').forEach(link => {
     link.addEventListener('click', (e) => {
         e.preventDefault();
-        const page = e.target.dataset.page;
+        const page = link.dataset.page;
 
         document.querySelectorAll('.menu a').forEach(a => a.classList.remove('active'));
-        e.target.classList.add('active');
+        link.classList.add('active');
 
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
         document.getElementById(page + '-page').classList.add('active');
@@ -56,16 +56,28 @@ document.querySelectorAll('.menu a[data-page]').forEach(link => {
 // ==========================================
 async function loadDashboard() {
     try {
-        const response = await apiRequest('/api/v1/admin/students?limit=5000');
-        const students = await response.json();
+        const [students, sertifikat, prezident] = await Promise.all([
+            apiRequest('/api/v1/admin/students?limit=5000').then(r => r.json()),
+            apiRequest('/api/v1/tests/?test_type=sertifikat').then(r => r.json()),
+            apiRequest('/api/v1/tests/?test_type=prezident').then(r => r.json()),
+        ]);
+        const active = [...sertifikat, ...prezident].filter(t => t.is_active).length;
 
-        const statsHtml = `
-            <div class="stat-card">
-                <h3>Jami talabalar</h3>
-                <p class="stat-number">${students.length}</p>
-            </div>
+        document.getElementById('stats').innerHTML = `
+            <div class="stat-card"><h3>Ro'yxatdan o'tgan talabalar</h3><p class="stat-number">${students.length}</p></div>
+            <div class="stat-card"><h3>Sertifikat testlari</h3><p class="stat-number">${sertifikat.length}</p></div>
+            <div class="stat-card"><h3>Prezident maktabi testlari</h3><p class="stat-number">${prezident.length}</p></div>
+            <div class="stat-card"><h3>Hozir faol testlar</h3><p class="stat-number">${active}</p></div>
         `;
-        document.getElementById('stats').innerHTML = statsHtml;
+        document.getElementById('recent-tests').innerHTML = `
+            <h2>Imtihon qanday o'tkaziladi</h2>
+            <ol class="steps">
+                <li><b>Test yarating</b><span>Javoblar kalitini kiriting, boshlanish va tugash vaqtini belgilang.</span></li>
+                <li><b>Kodni tarqating</b><span>Talabalar botga test kodini yuborib, testni telefonda ishlaydi.</span></li>
+                <li><b>Offline natijalarni qo'shing</b><span>Qog'ozda topshirganlarni Excel shablon orqali yuklang.</span></li>
+                <li><b>Rasch natijani oling</b><span>Test tugagach, milliy sertifikat uslubidagi PDF yoki Excel'ni yuklab oling.</span></li>
+            </ol>
+        `;
     } catch (error) {
         console.error('Error loading dashboard:', error);
     }
@@ -88,34 +100,111 @@ function toDatetimeLocal(isoStr) {
     return adjusted.toISOString().slice(0, 16);
 }
 
-// Build test card HTML (shared for both types)
+// Ikonkalar (inline SVG, 24x24, chiziqli)
+const ICON_PATHS = {
+    award: '<circle cx="12" cy="9" r="6"/><path d="m8.5 13.8-1.5 7.2 5-2.6 5 2.6-1.5-7.2"/>',
+    sheet: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/>',
+    file: '<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M8 13h8M8 17h5"/>',
+    download: '<path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/>',
+    upload: '<path d="M12 20V9"/><path d="m7 14 5-5 5 5"/><path d="M5 4h14"/>',
+    list: '<path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/>',
+    edit: '<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
+    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    reset: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>',
+    trash: '<path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 13h10l1-13"/><path d="M9 7V4h6v3"/>',
+    calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+};
+
+function icon(name) {
+    return `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${ICON_PATHS[name] || ''}</svg>`;
+}
+
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, ch => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[ch]));
+}
+
+// onclick atributi ichida xavfsiz ishlatish uchun (masalan, test nomi)
+function jsArg(value) {
+    return escapeHtml(JSON.stringify(String(value ?? '')));
+}
+
+// Test kartasi: ma'lumot + vazifasi bo'yicha guruhlangan amallar
 function buildTestCard(test) {
-    const startStr = formatDateTime(test.start_time);
-    const endStr = formatDateTime(test.end_time);
-    return `
-        <div class="test-card">
-            <h3>${test.title}</h3>
-            <p>Kod: ${test.test_code}</p>
-            <p>${test.is_active ? '✅ Faol' : '❌ Nofaol'}</p>
-            <p>⏰ Boshlanish: ${startStr}</p>
-            <p>⏰ Tugash: ${endStr}</p>
-            ${test.extra_minutes > 0 ? `<p>➕ Qo'shimcha: ${test.extra_minutes} daqiqa</p>` : ''}
+    const type = test.test_type || 'sertifikat';
+    const id = test.id;
+    const title = jsArg(test.title);
+    const isSertifikat = type === 'sertifikat';
+
+    const resultsGroup = `
+        <div class="action-group">
+            <span class="action-group-label">Natijalar</span>
             <div class="test-card-actions">
-                <button class="btn-export" onclick="exportExcel('${test.id}')">📊 Excel yuklab olish</button>
-                <button class="btn-export" onclick="exportPDF('${test.id}')">📄 PDF yuklab olish</button>
-                ${(test.test_type || 'sertifikat') === 'sertifikat' ? `
-                <button class="btn-rasch" onclick="exportRasch('${test.id}', 'pdf')">🏅 Rasch natija (PDF)</button>
-                <button class="btn-rasch" onclick="exportRasch('${test.id}', 'excel')">🏅 Rasch natija (Excel)</button>
-                <button class="btn-offline" onclick="downloadOfflineTemplate('${test.id}')">📥 Offline shablon</button>
-                <button class="btn-offline" onclick="uploadOfflineResults('${test.id}')">📤 Offline natija yuklash</button>
-                <button class="btn-offline" onclick="manageOfflineResults('${test.id}')">📋 Offline natijalar</button>` : ''}
-                <button class="btn-edit" onclick="openEditModal('${test.id}', '${test.test_type || 'sertifikat'}')">✏️ Tahrirlash</button>
-                <button class="btn-primary" onclick="extendAllSessions('${test.id}', '${test.title}')">⏱️ +5 min</button>
-                <button class="btn-delete" onclick="deleteTest('${test.id}', '${test.title}')">🗑️ O'chirish</button>
-                <button class="btn-reset" onclick="clearSessions('${test.id}', '${test.title}')">🔄 Sessiyalarni tozalash</button>
+                ${isSertifikat ? `
+                <button class="btn is-strong" onclick="exportRasch('${id}', 'pdf')">${icon('award')} Rasch natija · PDF</button>
+                <button class="btn" onclick="exportRasch('${id}', 'excel')">${icon('award')} Rasch natija · Excel</button>` : ''}
+                <button class="btn" onclick="exportExcel('${id}')">${icon('sheet')} Javoblar jadvali · Excel</button>
+                <button class="btn" onclick="exportPDF('${id}')">${icon('file')} Javoblar jadvali · PDF</button>
             </div>
-        </div>
+        </div>`;
+
+    const offlineGroup = isSertifikat ? `
+        <div class="action-group">
+            <span class="action-group-label">Offline</span>
+            <div class="test-card-actions">
+                <button class="btn" onclick="downloadOfflineTemplate('${id}')">${icon('download')} Shablonni yuklab olish</button>
+                <button class="btn" onclick="uploadOfflineResults('${id}')">${icon('upload')} Natijalarni yuklash</button>
+                <button class="btn" onclick="manageOfflineResults('${id}')">${icon('list')} Yuklanganlar</button>
+            </div>
+        </div>` : '';
+
+    const manageGroup = `
+        <div class="action-group">
+            <span class="action-group-label">Boshqarish</span>
+            <div class="test-card-actions">
+                <button class="btn" onclick="openEditModal('${id}', '${type}')">${icon('edit')} Tahrirlash</button>
+                <button class="btn" onclick="extendAllSessions('${id}', ${title})">${icon('clock')} Hammaga +5 daqiqa</button>
+                <button class="btn" onclick="clearSessions('${id}', ${title})">${icon('reset')} Sessiyalarni tozalash</button>
+                <button class="btn is-danger push-right" onclick="deleteTest('${id}', ${title})">${icon('trash')} Testni o'chirish</button>
+            </div>
+        </div>`;
+
+    return `
+        <article class="test-card ${test.is_active ? 'is-active' : ''}">
+            <div class="test-card-head">
+                <div>
+                    <h3>${escapeHtml(test.title)}</h3>
+                    <div class="test-meta">
+                        <span>Kod <span class="test-code">${escapeHtml(test.test_code)}</span></span>
+                        <span>${icon('calendar')} ${formatDateTime(test.start_time)} — ${formatDateTime(test.end_time)}</span>
+                        ${test.extra_minutes > 0 ? `<span>${icon('clock')} +${test.extra_minutes} daqiqa qo'shilgan</span>` : ''}
+                    </div>
+                </div>
+                <span class="status ${test.is_active ? 'is-on' : 'is-off'}">${test.is_active ? 'Faol' : 'Nofaol'}</span>
+            </div>
+            <div class="action-groups">
+                ${resultsGroup}
+                ${offlineGroup}
+                ${manageGroup}
+            </div>
+        </article>
     `;
+}
+
+function renderTestList(tests, containerId, createButtonId) {
+    const container = document.getElementById(containerId);
+    if (!tests.length) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <h3>Hali test yo'q</h3>
+                <p>Javoblar kalitini kiritib birinchi testni yarating. Kodini talabalarga bersangiz, ular botda testni boshlay oladi.</p>
+                <button class="btn-primary" onclick="document.getElementById('${createButtonId}').click()">${icon('plus')} Yangi test</button>
+            </div>`;
+        return;
+    }
+    container.innerHTML = `<div class="test-cards">${tests.map(buildTestCard).join('')}</div>`;
 }
 
 // ==========================================
@@ -125,12 +214,7 @@ async function loadTests() {
     try {
         const response = await apiRequest('/api/v1/tests/?test_type=sertifikat');
         const tests = await response.json();
-
-        let html = '<div class="test-cards">';
-        tests.forEach(test => { html += buildTestCard(test); });
-        html += '</div>';
-
-        document.getElementById('tests-list').innerHTML = html;
+        renderTestList(tests, 'tests-list', 'create-test-btn');
     } catch (error) {
         console.error('Error loading tests:', error);
     }
@@ -143,12 +227,7 @@ async function loadPrezidentTests() {
     try {
         const response = await apiRequest('/api/v1/tests/?test_type=prezident');
         const tests = await response.json();
-
-        let html = '<div class="test-cards">';
-        tests.forEach(test => { html += buildTestCard(test); });
-        html += '</div>';
-
-        document.getElementById('prezident-list').innerHTML = html;
+        renderTestList(tests, 'prezident-list', 'create-prezident-btn');
     } catch (error) {
         console.error('Error loading prezident tests:', error);
     }
@@ -350,7 +429,7 @@ async function openEditModal(testId, testType) {
                 const optionsHTML = options.map(opt =>
                     `<option value="${opt}" ${opt === currentVal ? 'selected' : ''}>${opt}</option>`
                 ).join('');
-                mcqGrid += `<div class="mcq-answer-input"><label>Q${i}:</label><select id="edit-prez-mcq-${i}">${optionsHTML}</select></div>`;
+                mcqGrid += `<div class="mcq-answer-input"><label>${i}</label><select id="edit-prez-mcq-${i}">${optionsHTML}</select></div>`;
             }
             document.getElementById('edit-prez-mcq-answers-grid').innerHTML = mcqGrid;
             document.getElementById('edit-prezident-modal').classList.remove('hidden');
@@ -370,7 +449,7 @@ async function openEditModal(testId, testType) {
                 const optionsHTML = options.map(opt =>
                     `<option value="${opt}" ${opt === currentVal ? 'selected' : ''}>${opt}</option>`
                 ).join('');
-                mcqGrid += `<div class="mcq-answer-input"><label>Q${i}:</label><select id="edit-mcq-${i}">${optionsHTML}</select></div>`;
+                mcqGrid += `<div class="mcq-answer-input"><label>${i}</label><select id="edit-mcq-${i}">${optionsHTML}</select></div>`;
             }
 
             let openEndedHTML = '<div class="open-ended-section"><h3>Yozma savollar (36-45)</h3>';
@@ -384,7 +463,7 @@ async function openEditModal(testId, testType) {
                 editMathValues[`edit-open-${i}-b`] = bVal;
                 openEndedHTML += `
                     <div class="open-question">
-                        <h4>Savol ${i}</h4>
+                        <h4>${i}</h4>
                         <div class="sub-answer"><label>a)</label><math-field id="edit-open-${i}-a" class="admin-math-input" virtual-keyboard-mode="onfocus"></math-field></div>
                         <div class="sub-answer"><label>b)</label><math-field id="edit-open-${i}-b" class="admin-math-input" virtual-keyboard-mode="onfocus"></math-field></div>
                     </div>`;
@@ -496,14 +575,14 @@ document.getElementById('create-test-btn').addEventListener('click', () => {
     for (let i = 1; i <= 35; i++) {
         const options = i <= 32 ? ['A', 'B', 'C', 'D'] : ['A', 'B', 'C', 'D', 'E', 'F'];
         const optionsHTML = options.map(opt => `<option value="${opt}">${opt}</option>`).join('');
-        mcqGrid += `<div class="mcq-answer-input"><label>Q${i}:</label><select id="mcq-${i}">${optionsHTML}</select></div>`;
+        mcqGrid += `<div class="mcq-answer-input"><label>${i}</label><select id="mcq-${i}">${optionsHTML}</select></div>`;
     }
 
     let openEndedHTML = '<div class="open-ended-section"><h3>Yozma savollar (36-45)</h3>';
     for (let i = 36; i <= 45; i++) {
         openEndedHTML += `
             <div class="open-question">
-                <h4>Savol ${i}</h4>
+                <h4>${i}</h4>
                 <div class="sub-answer"><label>a)</label><math-field id="open-${i}-a" class="admin-math-input" virtual-keyboard-mode="onfocus"></math-field></div>
                 <div class="sub-answer"><label>b)</label><math-field id="open-${i}-b" class="admin-math-input" virtual-keyboard-mode="onfocus"></math-field></div>
             </div>`;
@@ -563,7 +642,7 @@ document.getElementById('create-prezident-btn').addEventListener('click', () => 
     for (let i = 1; i <= 40; i++) {
         const options = ['A', 'B', 'C', 'D'];
         const optionsHTML = options.map(opt => `<option value="${opt}">${opt}</option>`).join('');
-        mcqGrid += `<div class="mcq-answer-input"><label>Q${i}:</label><select id="prez-mcq-${i}">${optionsHTML}</select></div>`;
+        mcqGrid += `<div class="mcq-answer-input"><label>${i}</label><select id="prez-mcq-${i}">${optionsHTML}</select></div>`;
     }
 
     document.getElementById('prez-mcq-answers-grid').innerHTML = mcqGrid;
@@ -625,7 +704,7 @@ if (isLoggedIn()) {
 // =================== ADMIN MANAGEMENT ===================
 async function loadAdmins() {
     const container = document.getElementById('admin-list');
-    container.innerHTML = '<p style="color: #666;">Adminlar ro\'yxati faqat yangi admin qo\'shish uchun.</p>';
+    container.innerHTML = "<p>Bu yerda yangi admin qo'shishingiz mumkin. Har bir admin barcha testlarni ko'radi va boshqaradi, shuning uchun loginni faqat ishonchli o'qituvchilarga bering.</p>";
 }
 
 document.getElementById('add-admin-btn').addEventListener('click', () => {
@@ -647,8 +726,8 @@ document.getElementById('add-admin-form').addEventListener('submit', async (e) =
         alert('Foydalanuvchi nomi va parolni kiriting!');
         return;
     }
-    if (password.length < 4) {
-        alert('Parol kamida 4 ta belgidan iborat bo\'lishi kerak!');
+    if (password.length < 6) {
+        alert('Parol kamida 6 ta belgidan iborat bo\'lishi kerak!');
         return;
     }
 

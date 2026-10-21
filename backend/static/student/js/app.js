@@ -106,6 +106,9 @@ async function loadSession() {
             document.getElementById('written-section').style.display = '';
         }
 
+        document.getElementById('progress-total').textContent = totalItems();
+        document.getElementById('progress').setAttribute('aria-valuemax', totalItems());
+
         // Initialize UI based on test type
         createMCQGrid();
         if (currentTestType === 'sertifikat') {
@@ -153,12 +156,12 @@ function createMCQGrid() {
         }
 
         const optionsHTML = options.map(opt =>
-            `<button class="option-btn" data-question="${i}" data-option="${opt}">${opt}</button>`
+            `<button class="option-btn" data-question="${i}" data-option="${opt}" role="radio" aria-checked="false" aria-label="${i}-savol, ${opt} javob">${opt}</button>`
         ).join('');
 
         item.innerHTML = `
-            <div class="mcq-number">${i}-savol</div>
-            <div class="mcq-options">
+            <div class="mcq-number">${i}<span class="unit">-savol</span></div>
+            <div class="mcq-options" role="radiogroup" aria-label="${i}-savol">
                 ${optionsHTML}
             </div>
         `;
@@ -172,10 +175,16 @@ function createMCQGrid() {
             const option = e.target.dataset.option;
 
             const buttons = container.querySelectorAll(`[data-question="${question}"]`);
-            buttons.forEach(btn => btn.classList.remove('selected'));
+            buttons.forEach(btn => {
+                btn.classList.remove('selected');
+                btn.setAttribute('aria-checked', 'false');
+            });
 
             e.target.classList.add('selected');
+            e.target.setAttribute('aria-checked', 'true');
+            e.target.closest('.mcq-item').classList.add('is-answered');
             mcqAnswers[question] = option;
+            updateProgress();
         }
     });
 }
@@ -189,7 +198,7 @@ function createWrittenFields() {
         const item = document.createElement('div');
         item.className = 'written-item';
         item.innerHTML = `
-            <div class="written-number">${i}-savol</div>
+            <div class="written-number" aria-label="${i}-savol">${i}</div>
             <div class="sub-answer">
                 <label>a)</label>
                 <div class="math-field-wrapper">
@@ -222,17 +231,40 @@ function createWrittenFields() {
 
         mfA.addEventListener('input', () => {
             writtenAnswers[i].a = mfA.value;
+            updateProgress();
         });
         mfB.addEventListener('input', () => {
             writtenAnswers[i].b = mfB.value;
+            updateProgress();
         });
     }
+}
+
+// Jami topshiriqlar soni: sertifikat 35 + 20 (yozma a/b), prezident 40
+function totalItems() {
+    return currentTestType === 'prezident' ? 40 : 55;
+}
+
+// Belgilangan javoblar sonini yuqori panelda ko'rsatish
+function updateProgress() {
+    let answered = Object.keys(mcqAnswers).length;
+    if (currentTestType === 'sertifikat') {
+        for (const key in writtenAnswers) {
+            if ((writtenAnswers[key].a || '').trim()) answered++;
+            if ((writtenAnswers[key].b || '').trim()) answered++;
+        }
+    }
+    const total = totalItems();
+    document.getElementById('progress-count').textContent = answered;
+    document.getElementById('progress-fill').style.width = `${Math.min(100, answered / total * 100)}%`;
+    document.getElementById('progress').setAttribute('aria-valuenow', answered);
 }
 
 // Show warning
 function showWarning() {
     const warning = document.getElementById('warning');
-    warning.style.display = 'block';
+    warning.style.display = 'inline';
+    document.getElementById('exam-bar').classList.add('is-urgent');
 }
 
 // Handle time expire - auto submit
@@ -329,86 +361,81 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
 window.addEventListener('DOMContentLoaded', loadSession);
 
 // Show results after submission
+const ICON_CHECK = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+
+function resultMark(isCorrect, text) {
+    const cls = isCorrect ? 'is-correct' : 'is-wrong';
+    const label = isCorrect ? "to'g'ri" : 'xato';
+    return `<span class="mark ${cls}" title="${text} — ${label}" aria-label="${text} ${label}">${text}</span>`;
+}
+
 function showResults(result) {
     const container = document.querySelector('.container');
-    const totalMCQ = currentTestType === 'prezident' ? 40 : 35;
-
-    // Build MCQ results grid (5 per row)
     const mcqResults = result.mcq_answers || [];
-    let mcqRows = '';
-    for (let i = 0; i < mcqResults.length; i += 5) {
-        const chunk = mcqResults.slice(i, i + 5);
-        const items = chunk.map(a => {
-            const icon = a.is_correct ? '✅' : '❌';
-            const cls = a.is_correct ? 'result-correct' : 'result-wrong';
-            return `<span class="result-item ${cls}">${a.question_number}-${icon}</span>`;
-        }).join('');
-        mcqRows += `<div class="result-row">${items}</div>`;
-    }
-
-    // Build written results (only for sertifikat)
     const writtenResults = result.written_answers || [];
-    let writtenHTML = '';
-    if (writtenResults.length > 0) {
-        writtenHTML = writtenResults.map(wa => {
-            const iconA = (wa.score_a === 1) ? '✅' : '❌';
-            const iconB = (wa.score_b === 1) ? '✅' : '❌';
-            return `<div class="result-written-item">${wa.question_number}-savol: a) ${iconA}  b) ${iconB}</div>`;
-        }).join('');
-    }
+
+    const mcqMarks = mcqResults.map(a => resultMark(a.is_correct, a.question_number)).join('');
+    const writtenRows = writtenResults.map(wa => `
+        <div class="result-written-item">
+            <span class="q">${wa.question_number}</span>
+            <span class="part">${resultMark(wa.score_a === 1, 'a')}</span>
+            <span class="part">${resultMark(wa.score_b === 1, 'b')}</span>
+        </div>`).join('');
 
     const mcqScore = result.mcq_score || 0;
     const writtenScore = result.written_score || 0;
     const totalScore = result.total_score || 0;
-
-    // Adaptive display based on test type
-    const mcqLabel = currentTestType === 'prezident' ? `1-40` : `1-35`;
+    const mcqLabel = currentTestType === 'prezident' ? '1-40' : '1-35';
     const mcqMax = currentTestType === 'prezident' ? 40 : 35;
 
     container.innerHTML = `
         <div class="results-page">
             <div class="results-header">
-                <div class="results-check">✅</div>
-                <h1>Test muvaffaqiyatli topshirildi!</h1>
+                <div class="results-check">${ICON_CHECK}</div>
+                <div>
+                    <h1>Test topshirildi</h1>
+                    <p>Javoblaringiz qabul qilindi. Quyida har bir savol bo'yicha natija.</p>
+                </div>
+            </div>
+
+            <div class="results-scores">
+                <div class="score-item">
+                    <div class="score-label">Test savollari</div>
+                    <div class="score-value">${mcqScore}<small> / ${mcqMax}</small></div>
+                </div>
+                ${currentTestType === 'sertifikat' ? `
+                <div class="score-item">
+                    <div class="score-label">Yozma qismlar</div>
+                    <div class="score-value">${writtenScore}<small> / 20</small></div>
+                </div>` : ''}
+                <div class="score-item score-total">
+                    <div class="score-label">Jami to'g'ri</div>
+                    <div class="score-value">${totalScore}</div>
+                </div>
             </div>
 
             <div class="results-section">
-                <h2>📝 Test savollari (${mcqLabel})</h2>
-                <div class="results-mcq-grid">
-                    ${mcqRows}
+                <h2>Test savollari (${mcqLabel})</h2>
+                <div class="results-legend">
+                    <span><span class="mark is-correct"></span> to'g'ri</span>
+                    <span><span class="mark is-wrong"></span> xato yoki belgilanmagan</span>
                 </div>
+                <div class="results-mcq-grid">${mcqMarks}</div>
             </div>
 
             ${writtenResults.length > 0 ? `
             <div class="results-section">
-                <h2>✍️ Yozma savollar (36-45)</h2>
-                <div class="results-written-grid">
-                    ${writtenHTML}
-                </div>
-            </div>
-            ` : ''}
+                <h2>Yozma savollar (36-45)</h2>
+                <div class="results-written-grid">${writtenRows}</div>
+            </div>` : ''}
 
-            <div class="results-summary">
-                <h2>📈 Umumiy natija</h2>
-                <div class="results-scores">
-                    <div class="score-item">
-                        <div class="score-label">📝 Test</div>
-                        <div class="score-value">${mcqScore}/${mcqMax}</div>
-                    </div>
-                    ${currentTestType === 'sertifikat' ? `
-                    <div class="score-item">
-                        <div class="score-label">✍️ Yozma</div>
-                        <div class="score-value">${writtenScore}/20</div>
-                    </div>
-                    ` : ''}
-                    <div class="score-item score-total">
-                        <div class="score-label">⭐ Jami</div>
-                        <div class="score-value">${totalScore}</div>
-                    </div>
-                </div>
-            </div>
+            ${currentTestType === 'sertifikat' ? `
+            <p class="results-note">Milliy sertifikat uslubidagi Rasch balli va darajangiz barcha ishtirokchilar
+                asosida hisoblanadi. Test yakunlangach uni botdagi “Natijalarim” bo'limida ko'rasiz.</p>` : ''}
         </div>
     `;
+    document.getElementById('exam-bar').classList.add('is-done');
+    window.scrollTo({ top: 0 });
 }
 
 // Prevent accidental page close

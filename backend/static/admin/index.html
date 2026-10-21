@@ -4,247 +4,310 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin - Test Platformasi</title>
-    <link rel="stylesheet" href="css/admin.css">
+    <title>Sayxun Team — Admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=Unbounded:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/admin.css?v=6">
 </head>
 
 <body>
+    <!-- Kirish -->
     <div class="login-container" id="login-page">
         <div class="login-card">
-            <h1>🔐 Admin Kirish</h1>
+            <div class="brand brand-login">
+                <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+                <span class="brand-text"><b>Sayxun Team</b><small>Test platformasi</small></span>
+            </div>
+            <h1>Admin panelga kirish</h1>
             <form id="login-form">
                 <div class="form-group">
-                    <label for="username">Foydalanuvchi nomi</label>
-                    <input type="text" id="username" required>
+                    <label for="username">Login</label>
+                    <input type="text" id="username" autocomplete="username" required>
                 </div>
                 <div class="form-group">
                     <label for="password">Parol</label>
-                    <input type="password" id="password" required>
+                    <input type="password" id="password" autocomplete="current-password" required>
                 </div>
-                <button type="submit" class="btn-primary">Kirish</button>
+                <button type="submit" class="btn-primary btn-block">Kirish</button>
             </form>
         </div>
     </div>
 
     <div class="admin-container hidden" id="admin-panel">
-        <nav class="sidebar">
-            <div class="logo">📚 Test Platformasi</div>
+        <nav class="sidebar" aria-label="Asosiy menyu">
+            <div class="brand">
+                <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+                <span class="brand-text"><b>Sayxun Team</b><small>Test platformasi</small></span>
+            </div>
             <ul class="menu">
-                <li><a href="#" data-page="dashboard" class="active">Bosh sahifa</a></li>
-                <li><a href="#" data-page="tests">Sertifikat testlari</a></li>
-                <li><a href="#" data-page="prezident">Prezident maktabi testlari</a></li>
-                <li><a href="#" data-page="admins">Adminlar</a></li>
-                <li><a href="#" id="logout-btn">Chiqish</a></li>
+                <li><a href="#" data-page="dashboard" class="active">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/></svg>
+                    Bosh sahifa</a></li>
+                <li><a href="#" data-page="tests">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><circle cx="12" cy="14.5" r="2.5"/><path d="m10.5 16.5-1 3.5 2.5-1.2 2.5 1.2-1-3.5"/></svg>
+                    Sertifikat testlari</a></li>
+                <li><a href="#" data-page="prezident">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 10 12 5 2 10l10 5 10-5z"/><path d="M6 12v5c3 2.5 9 2.5 12 0v-5"/></svg>
+                    Prezident maktabi</a></li>
+                <li><a href="#" data-page="admins">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="4"/><path d="M2 21v-1a6 6 0 0 1 6-6h2a6 6 0 0 1 6 6v1"/><path d="M16 4.13a4 4 0 0 1 0 7.75"/><path d="M22 21v-1a5 5 0 0 0-3.5-4.77"/></svg>
+                    Adminlar</a></li>
             </ul>
+            <a href="#" id="logout-btn" class="logout">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
+                Chiqish</a>
         </nav>
 
         <main class="main-content">
-            <!-- Dashboard -->
+            <!-- Bosh sahifa -->
             <div class="page active" id="dashboard-page">
-                <h1>Bosh sahifa</h1>
+                <header class="page-head">
+                    <div>
+                        <h1>Bosh sahifa</h1>
+                        <p>Platformadagi talabalar va testlar.</p>
+                    </div>
+                </header>
                 <div class="stats-grid" id="stats"></div>
                 <div class="recent-tests" id="recent-tests"></div>
             </div>
 
-            <!-- Sertifikat Tests -->
+            <!-- Sertifikat testlari -->
             <div class="page" id="tests-page">
-                <h1>Sertifikat testlari</h1>
-                <button class="btn-primary" id="create-test-btn">+ Yangi test yaratish</button>
+                <header class="page-head">
+                    <div>
+                        <h1>Sertifikat testlari</h1>
+                        <p>35 ta yopiq va 10 ta yozma savol. Natijalar milliy sertifikat uslubida Rasch bo'yicha hisoblanadi.</p>
+                    </div>
+                    <button class="btn-primary" id="create-test-btn">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                        Yangi test</button>
+                </header>
                 <div class="tests-list" id="tests-list"></div>
             </div>
 
-            <!-- Prezident Maktabi Tests -->
+            <!-- Prezident maktabi testlari -->
             <div class="page" id="prezident-page">
-                <h1>Prezident maktabi testlari</h1>
-                <button class="btn-primary" id="create-prezident-btn">+ Yangi test yaratish</button>
+                <header class="page-head">
+                    <div>
+                        <h1>Prezident maktabi testlari</h1>
+                        <p>40 ta yopiq savol, har birida 4 ta variant.</p>
+                    </div>
+                    <button class="btn-primary" id="create-prezident-btn">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                        Yangi test</button>
+                </header>
                 <div class="tests-list" id="prezident-list"></div>
             </div>
 
-            <!-- Admins -->
+            <!-- Adminlar -->
             <div class="page" id="admins-page">
-                <h1>Adminlar</h1>
-                <button class="btn-primary" id="add-admin-btn">+ Yangi admin qo'shish</button>
-                <div class="admin-list" id="admin-list" style="margin-top: 20px;"></div>
+                <header class="page-head">
+                    <div>
+                        <h1>Adminlar</h1>
+                        <p>Admin panelga kira oladigan foydalanuvchilar.</p>
+                    </div>
+                    <button class="btn-primary" id="add-admin-btn">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                        Admin qo'shish</button>
+                </header>
+                <div class="admin-list" id="admin-list"></div>
             </div>
         </main>
     </div>
 
-    <!-- Create Sertifikat Test Modal -->
-    <div class="modal hidden" id="create-test-modal">
+    <!-- Sertifikat test yaratish -->
+    <div class="modal hidden" id="create-test-modal" role="dialog" aria-modal="true" aria-labelledby="create-test-heading">
         <div class="modal-content">
-            <h2>Yangi sertifikat test yaratish</h2>
+            <h2 id="create-test-heading">Yangi sertifikat testi</h2>
             <form id="create-test-form">
-                <div class="form-group">
-                    <label>Test kodi</label>
-                    <input type="text" id="test-code" required>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="test-code">Test kodi</label>
+                        <input type="text" id="test-code" required>
+                    </div>
+                    <div class="form-group form-grow">
+                        <label for="test-title">Test nomi</label>
+                        <input type="text" id="test-title" required>
+                    </div>
                 </div>
                 <div class="form-group">
-                    <label>Test nomi</label>
-                    <input type="text" id="test-title" required>
-                </div>
-                <div class="form-group">
-                    <label>Tavsif</label>
+                    <label for="test-desc">Tavsif</label>
                     <textarea id="test-desc"></textarea>
                 </div>
-                <div class="form-group">
-                    <label>Boshlanish vaqti</label>
-                    <input type="datetime-local" id="test-start-time">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="test-start-time">Boshlanish vaqti</label>
+                        <input type="datetime-local" id="test-start-time">
+                    </div>
+                    <div class="form-group">
+                        <label for="test-end-time">Tugash vaqti</label>
+                        <input type="datetime-local" id="test-end-time">
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label>Tugash vaqti</label>
-                    <input type="datetime-local" id="test-end-time">
-                </div>
-                <h3>Test javoblari (1-35)</h3>
+                <h3>To'g'ri javoblar: 1–35</h3>
                 <div id="mcq-answers-grid"></div>
                 <div class="modal-actions">
                     <button type="button" class="btn-secondary" id="cancel-create">Bekor qilish</button>
-                    <button type="submit" class="btn-primary">Test yaratish</button>
+                    <button type="submit" class="btn-primary">Testni yaratish</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Edit Sertifikat Test Modal -->
-    <div class="modal hidden" id="edit-test-modal">
+    <!-- Sertifikat test tahrirlash -->
+    <div class="modal hidden" id="edit-test-modal" role="dialog" aria-modal="true" aria-labelledby="edit-test-heading">
         <div class="modal-content">
-            <h2>✏️ Sertifikat test tahrirlash</h2>
+            <h2 id="edit-test-heading">Sertifikat testini tahrirlash</h2>
             <form id="edit-test-form">
-                <div class="form-group">
-                    <label>Test kodi</label>
-                    <input type="text" id="edit-test-code" required>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="edit-test-code">Test kodi</label>
+                        <input type="text" id="edit-test-code" required>
+                    </div>
+                    <div class="form-group form-grow">
+                        <label for="edit-test-title">Test nomi</label>
+                        <input type="text" id="edit-test-title" required>
+                    </div>
                 </div>
                 <div class="form-group">
-                    <label>Test nomi</label>
-                    <input type="text" id="edit-test-title" required>
-                </div>
-                <div class="form-group">
-                    <label>Tavsif</label>
+                    <label for="edit-test-desc">Tavsif</label>
                     <textarea id="edit-test-desc"></textarea>
                 </div>
                 <div class="form-group">
                     <label class="checkbox-label">
                         <input type="checkbox" id="edit-test-active">
-                        Faol
+                        Faol — talabalar test kodini kiritib testni boshlay oladi
                     </label>
                 </div>
-                <div class="form-group">
-                    <label>Boshlanish vaqti</label>
-                    <input type="datetime-local" id="edit-test-start-time">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="edit-test-start-time">Boshlanish vaqti</label>
+                        <input type="datetime-local" id="edit-test-start-time">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-test-end-time">Tugash vaqti</label>
+                        <input type="datetime-local" id="edit-test-end-time">
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label>Tugash vaqti</label>
-                    <input type="datetime-local" id="edit-test-end-time">
-                </div>
-                <h3>Test javoblari (1-35)</h3>
+                <h3>To'g'ri javoblar: 1–35</h3>
                 <div id="edit-mcq-answers-grid"></div>
                 <div class="modal-actions">
                     <button type="button" class="btn-secondary" id="cancel-edit">Bekor qilish</button>
-                    <button type="submit" class="btn-primary">💾 Saqlash</button>
+                    <button type="submit" class="btn-primary">O'zgarishlarni saqlash</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Create Prezident Test Modal -->
-    <div class="modal hidden" id="create-prezident-modal">
+    <!-- Prezident test yaratish -->
+    <div class="modal hidden" id="create-prezident-modal" role="dialog" aria-modal="true" aria-labelledby="create-prez-heading">
         <div class="modal-content">
-            <h2>Yangi Prezident maktabi test yaratish</h2>
+            <h2 id="create-prez-heading">Yangi Prezident maktabi testi</h2>
             <form id="create-prezident-form">
-                <div class="form-group">
-                    <label>Test kodi</label>
-                    <input type="text" id="prez-test-code" required>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="prez-test-code">Test kodi</label>
+                        <input type="text" id="prez-test-code" required>
+                    </div>
+                    <div class="form-group form-grow">
+                        <label for="prez-test-title">Test nomi</label>
+                        <input type="text" id="prez-test-title" required>
+                    </div>
                 </div>
                 <div class="form-group">
-                    <label>Test nomi</label>
-                    <input type="text" id="prez-test-title" required>
-                </div>
-                <div class="form-group">
-                    <label>Tavsif</label>
+                    <label for="prez-test-desc">Tavsif</label>
                     <textarea id="prez-test-desc"></textarea>
                 </div>
-                <div class="form-group">
-                    <label>Boshlanish vaqti</label>
-                    <input type="datetime-local" id="prez-test-start-time">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="prez-test-start-time">Boshlanish vaqti</label>
+                        <input type="datetime-local" id="prez-test-start-time">
+                    </div>
+                    <div class="form-group">
+                        <label for="prez-test-end-time">Tugash vaqti</label>
+                        <input type="datetime-local" id="prez-test-end-time">
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label>Tugash vaqti</label>
-                    <input type="datetime-local" id="prez-test-end-time">
-                </div>
-                <h3>Test javoblari (1-40)</h3>
+                <h3>To'g'ri javoblar: 1–40</h3>
                 <div id="prez-mcq-answers-grid"></div>
                 <div class="modal-actions">
                     <button type="button" class="btn-secondary" id="cancel-create-prez">Bekor qilish</button>
-                    <button type="submit" class="btn-primary">Test yaratish</button>
+                    <button type="submit" class="btn-primary">Testni yaratish</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Edit Prezident Test Modal -->
-    <div class="modal hidden" id="edit-prezident-modal">
+    <!-- Prezident test tahrirlash -->
+    <div class="modal hidden" id="edit-prezident-modal" role="dialog" aria-modal="true" aria-labelledby="edit-prez-heading">
         <div class="modal-content">
-            <h2>✏️ Prezident maktabi test tahrirlash</h2>
+            <h2 id="edit-prez-heading">Prezident maktabi testini tahrirlash</h2>
             <form id="edit-prezident-form">
-                <div class="form-group">
-                    <label>Test kodi</label>
-                    <input type="text" id="edit-prez-test-code" required>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="edit-prez-test-code">Test kodi</label>
+                        <input type="text" id="edit-prez-test-code" required>
+                    </div>
+                    <div class="form-group form-grow">
+                        <label for="edit-prez-test-title">Test nomi</label>
+                        <input type="text" id="edit-prez-test-title" required>
+                    </div>
                 </div>
                 <div class="form-group">
-                    <label>Test nomi</label>
-                    <input type="text" id="edit-prez-test-title" required>
-                </div>
-                <div class="form-group">
-                    <label>Tavsif</label>
+                    <label for="edit-prez-test-desc">Tavsif</label>
                     <textarea id="edit-prez-test-desc"></textarea>
                 </div>
                 <div class="form-group">
                     <label class="checkbox-label">
                         <input type="checkbox" id="edit-prez-test-active">
-                        Faol
+                        Faol — talabalar test kodini kiritib testni boshlay oladi
                     </label>
                 </div>
-                <div class="form-group">
-                    <label>Boshlanish vaqti</label>
-                    <input type="datetime-local" id="edit-prez-test-start-time">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="edit-prez-test-start-time">Boshlanish vaqti</label>
+                        <input type="datetime-local" id="edit-prez-test-start-time">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-prez-test-end-time">Tugash vaqti</label>
+                        <input type="datetime-local" id="edit-prez-test-end-time">
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label>Tugash vaqti</label>
-                    <input type="datetime-local" id="edit-prez-test-end-time">
-                </div>
-                <h3>Test javoblari (1-40)</h3>
+                <h3>To'g'ri javoblar: 1–40</h3>
                 <div id="edit-prez-mcq-answers-grid"></div>
                 <div class="modal-actions">
                     <button type="button" class="btn-secondary" id="cancel-edit-prez">Bekor qilish</button>
-                    <button type="submit" class="btn-primary">💾 Saqlash</button>
+                    <button type="submit" class="btn-primary">O'zgarishlarni saqlash</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Add Admin Modal -->
-    <div class="modal hidden" id="add-admin-modal">
-        <div class="modal-content" style="max-width: 400px;">
-            <h2>👤 Yangi admin qo'shish</h2>
+    <!-- Admin qo'shish -->
+    <div class="modal hidden" id="add-admin-modal" role="dialog" aria-modal="true" aria-labelledby="add-admin-heading">
+        <div class="modal-content modal-narrow">
+            <h2 id="add-admin-heading">Yangi admin</h2>
             <form id="add-admin-form">
                 <div class="form-group">
-                    <label>Foydalanuvchi nomi</label>
+                    <label for="new-admin-username">Login</label>
                     <input type="text" id="new-admin-username" required minlength="3">
                 </div>
                 <div class="form-group">
-                    <label>Parol</label>
-                    <input type="password" id="new-admin-password" required minlength="4">
+                    <label for="new-admin-password">Parol</label>
+                    <input type="password" id="new-admin-password" required minlength="6">
                 </div>
                 <div class="modal-actions">
                     <button type="button" class="btn-secondary" id="cancel-add-admin">Bekor qilish</button>
-                    <button type="submit" class="btn-primary">✅ Qo'shish</button>
+                    <button type="submit" class="btn-primary">Admin qo'shish</button>
                 </div>
             </form>
         </div>
     </div>
 
     <script src="https://unpkg.com/mathlive"></script>
-    <script src="js/auth.js"></script>
-    <script src="js/dashboard.js?v=4"></script>
+    <script src="js/auth.js?v=2"></script>
+    <script src="js/dashboard.js?v=5"></script>
 </body>
 
 </html>
