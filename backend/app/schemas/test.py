@@ -21,6 +21,7 @@ class TestCreate(BaseModel):
     start_time: Optional[datetime] = None   # Test boshlanish vaqti
     end_time: Optional[datetime] = None     # Test tugash vaqti
     test_type: str = Field(default='sertifikat', description="'sertifikat' or 'prezident'")
+    price: int = Field(default=0, ge=0, le=100_000_000, description="Narx (so'm), 0 - bepul")
     answer_key: AnswerKeyCreate
 
 
@@ -36,6 +37,7 @@ class TestResponse(BaseModel):
     end_time: datetime | None = None
     extra_minutes: int = 0
     test_type: str = 'sertifikat'
+    price: int = 0
     created_at: datetime
     
     class Config:
@@ -56,4 +58,5 @@ class TestUpdate(BaseModel):
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
     test_type: str | None = None
+    price: int | None = Field(default=None, ge=0, le=100_000_000)
     answer_key: AnswerKeyCreate | None = None

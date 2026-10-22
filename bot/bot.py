@@ -8,7 +8,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 from config import settings
 from api_client import api_client
-from handlers import start, registration, test_entry, results, callbacks
+from handlers import start, registration, test_entry, results, callbacks, payments
 
 
 # Configure logging
@@ -28,6 +28,7 @@ async def main():
     
     # Include routers (callbacks first to handle inline buttons)
     dp.include_router(callbacks.router)
+    dp.include_router(payments.router)
     dp.include_router(start.router)
     dp.include_router(registration.router)
     dp.include_router(test_entry.router)

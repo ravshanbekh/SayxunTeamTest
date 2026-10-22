@@ -40,7 +40,8 @@ async def create_test(
         is_active=True,
         start_time=test_data.start_time,
         end_time=test_data.end_time,
-        test_type=test_data.test_type
+        test_type=test_data.test_type,
+        price=test_data.price or 0,
     )
     
     db.add(test)
@@ -197,6 +198,8 @@ async def update_test_with_answers(
         test.start_time = test_data.start_time
     if test_data.end_time is not None:
         test.end_time = test_data.end_time
+    if test_data.price is not None:
+        test.price = test_data.price
     
     # Update answer key if provided
     if test_data.answer_key is not None:

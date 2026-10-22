@@ -13,7 +13,7 @@ import sys
 from sqlalchemy import select
 
 from app.database import AsyncSessionLocal, init_db
-from app.models import user, admin, test, session, result, offline  # noqa: F401 - modellarni ro'yxatdan o'tkazish
+from app.models import user, admin, test, session, result, offline, payment  # noqa: F401 - modellarni ro'yxatdan o'tkazish
 from app.models.admin import AdminUser
 from app.schemas.admin import AdminCreate
 from app.services.auth_service import create_admin

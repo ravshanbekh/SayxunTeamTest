@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=Unbounded:wght@500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/admin.css?v=8">
+    <link rel="stylesheet" href="css/admin.css?v=9">
 </head>
 
 <body>
@@ -61,6 +61,9 @@
                 <li><a href="#" data-page="prezident">
                     <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 10 12 5 2 10l10 5 10-5z"/><path d="M6 12v5c3 2.5 9 2.5 12 0v-5"/></svg>
                     Prezident maktabi</a></li>
+                <li><a href="#" data-page="payments">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/><path d="M6 15h4"/></svg>
+                    To'lovlar <span class="nav-badge hidden" id="payments-badge">0</span></a></li>
                 <li><a href="#" data-page="admins">
                     <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="4"/><path d="M2 21v-1a6 6 0 0 1 6-6h2a6 6 0 0 1 6 6v1"/><path d="M16 4.13a4 4 0 0 1 0 7.75"/><path d="M22 21v-1a5 5 0 0 0-3.5-4.77"/></svg>
                     Adminlar</a></li>
@@ -117,6 +120,55 @@
                 <div class="tests-list" id="prezident-list"></div>
             </div>
 
+            <!-- To'lovlar -->
+            <div class="page" id="payments-page">
+                <header class="page-head">
+                    <div class="page-title">
+                        <img class="illus" src="../brand/icon-exam.webp" alt="">
+                        <div>
+                        <h1>To'lovlar</h1>
+                        <p>Talabalar botga yuborgan cheklar. Tasdiqlangan summa talabaning balansiga qo'shiladi va
+                           pullik testga kirishda yechiladi. Cheklar test tugagach avtomatik o'chiriladi.</p>
+                        </div>
+                    </div>
+                </header>
+
+                <details class="pay-settings" id="pay-settings">
+                    <summary>To'lov kartasi rekvizitlari</summary>
+                    <form id="pay-settings-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="pay-card-number">Karta raqami</label>
+                                <input type="text" id="pay-card-number" placeholder="8600 0000 0000 0000" inputmode="numeric">
+                            </div>
+                            <div class="form-group">
+                                <label for="pay-card-holder">Karta egasi</label>
+                                <input type="text" id="pay-card-holder" placeholder="Ism Familiya">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="pay-note">Talabaga izoh (ixtiyoriy)</label>
+                            <input type="text" id="pay-note" placeholder="Masalan: to'lov izohiga ism-familiyangizni yozing">
+                        </div>
+                        <button type="submit" class="btn-primary">Rekvizitlarni saqlash</button>
+                    </form>
+                </details>
+
+                <div class="pay-toolbar">
+                    <div class="tabs" role="tablist">
+                        <button class="tab is-active" data-status="pending" role="tab">Kutilmoqda <b id="count-pending">0</b></button>
+                        <button class="tab" data-status="approved" role="tab">Tasdiqlangan <b id="count-approved">0</b></button>
+                        <button class="tab" data-status="rejected" role="tab">Rad etilgan <b id="count-rejected">0</b></button>
+                    </div>
+                    <div class="pay-bulk" id="pay-bulk">
+                        <label class="checkbox-label"><input type="checkbox" id="pay-select-all"> Hammasini belgilash</label>
+                        <button class="btn" id="pay-approve-selected" disabled>Belgilanganlarni tasdiqlash</button>
+                        <button class="btn is-strong" id="pay-approve-all">Hammasini tasdiqlash</button>
+                    </div>
+                </div>
+                <div id="payments-list"></div>
+            </div>
+
             <!-- Adminlar -->
             <div class="page" id="admins-page">
                 <header class="page-head">
@@ -165,6 +217,18 @@
                         <input type="datetime-local" id="test-end-time">
                     </div>
                 </div>
+                <div class="form-row price-row">
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="test-paid">
+                            Pullik test — kirish uchun balansdan to'lov olinadi
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label for="test-price">Narxi (so'm)</label>
+                        <input type="number" id="test-price" min="0" step="1000" placeholder="masalan, 30000" disabled>
+                    </div>
+                </div>
                 <h3>To'g'ri javoblar: 1–35</h3>
                 <div id="mcq-answers-grid"></div>
                 <div class="modal-actions">
@@ -210,6 +274,18 @@
                         <input type="datetime-local" id="edit-test-end-time">
                     </div>
                 </div>
+                <div class="form-row price-row">
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="edit-test-paid">
+                            Pullik test — kirish uchun balansdan to'lov olinadi
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-test-price">Narxi (so'm)</label>
+                        <input type="number" id="edit-test-price" min="0" step="1000" placeholder="masalan, 30000" disabled>
+                    </div>
+                </div>
                 <h3>To'g'ri javoblar: 1–35</h3>
                 <div id="edit-mcq-answers-grid"></div>
                 <div class="modal-actions">
@@ -247,6 +323,18 @@
                     <div class="form-group">
                         <label for="prez-test-end-time">Tugash vaqti</label>
                         <input type="datetime-local" id="prez-test-end-time">
+                    </div>
+                </div>
+                <div class="form-row price-row">
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="prez-test-paid">
+                            Pullik test — kirish uchun balansdan to'lov olinadi
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label for="prez-test-price">Narxi (so'm)</label>
+                        <input type="number" id="prez-test-price" min="0" step="1000" placeholder="masalan, 30000" disabled>
                     </div>
                 </div>
                 <h3>To'g'ri javoblar: 1–40</h3>
@@ -294,6 +382,18 @@
                         <input type="datetime-local" id="edit-prez-test-end-time">
                     </div>
                 </div>
+                <div class="form-row price-row">
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="edit-prez-test-paid">
+                            Pullik test — kirish uchun balansdan to'lov olinadi
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-prez-test-price">Narxi (so'm)</label>
+                        <input type="number" id="edit-prez-test-price" min="0" step="1000" placeholder="masalan, 30000" disabled>
+                    </div>
+                </div>
                 <h3>To'g'ri javoblar: 1–40</h3>
                 <div id="edit-prez-mcq-answers-grid"></div>
                 <div class="modal-actions">
@@ -301,6 +401,20 @@
                     <button type="submit" class="btn-primary">O'zgarishlarni saqlash</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Chekni ko'rish -->
+    <div class="modal hidden" id="receipt-modal" role="dialog" aria-modal="true" aria-labelledby="receipt-heading">
+        <div class="modal-content receipt-content">
+            <h2 id="receipt-heading">Chek</h2>
+            <p class="receipt-meta" id="receipt-meta"></p>
+            <div class="receipt-view" id="receipt-view"></div>
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" id="receipt-close">Yopish</button>
+                <button type="button" class="btn is-danger" id="receipt-reject">Rad etish</button>
+                <button type="button" class="btn-primary" id="receipt-approve">Tasdiqlash</button>
+            </div>
         </div>
     </div>
 
@@ -327,7 +441,7 @@
 
     <script src="https://unpkg.com/mathlive"></script>
     <script src="js/auth.js?v=2"></script>
-    <script src="js/dashboard.js?v=7"></script>
+    <script src="js/dashboard.js?v=8"></script>
 </body>
 
 </html>

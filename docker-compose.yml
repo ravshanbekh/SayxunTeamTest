@@ -43,6 +43,8 @@ services:
       UPLOAD_DIR: /app/uploads
       EXPORT_DIR: /app/exports
       RASCH_MAX_SCORE: ${RASCH_MAX_SCORE:-}
+      # to'lov tasdiqlanganda/rad etilganda talabaga bot orqali xabar yuborish uchun
+      BOT_TOKEN: ${BOT_TOKEN}
       TZ: Asia/Tashkent
     volumes:
       - uploads:/app/uploads

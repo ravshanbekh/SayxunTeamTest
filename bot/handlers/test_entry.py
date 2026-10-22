@@ -77,6 +77,24 @@ async def process_test_code(message: Message, state: FSMContext):
         # Create session
         session = await api_client.create_session(user['id'], test['id'])
         
+        if session and session.get('payment_required'):
+            # Pullik test, balans yetarli emas
+            from handlers.payments import format_sum, show_payment_instructions
+            info = session['payment_required']
+            intro = (f"💰 <b>Bu test pullik:</b> {format_sum(info.get('price'))}\n"
+                     f"📝 {test['title']} ({test['test_code']})\n"
+                     f"💳 Balansingiz: {format_sum(info.get('balance'))}\n\n")
+            if info.get('pending_amount', 0) >= info.get('required', 0):
+                await state.clear()
+                await message.answer(
+                    intro + "⏳ Siz yuborgan chek tekshirilmoqda. Admin tasdiqlagach sizga xabar keladi, "
+                    "shundan keyin test kodini qayta yuboring.",
+                    parse_mode="HTML", reply_markup=get_main_menu())
+                return
+            intro += f"Testga kirish uchun balansingizni <b>{format_sum(info.get('required'))}</b> ga to'ldiring.\n\n"
+            await show_payment_instructions(message, state, int(info.get('required') or 0), test=test, intro=intro)
+            return
+
         if not session or session.get('error'):
             error_msg = session.get('error', '') if session else ''
             
@@ -131,7 +149,8 @@ async def process_test_code(message: Message, state: FSMContext):
         msg_text = (
             f"✅ <b>Test topildi!</b>\n\n"
             f"📝 {test['title']}\n"
-            f"⏱️ Qolgan vaqt: {time_str}\n"
+            + (f"💰 Narxi: {int(test['price']):,} so'm (balansdan yechildi)\n".replace(",", " ") if test.get('price') else "")
+            + f"⏱️ Qolgan vaqt: {time_str}\n"
             f"📊 Savollar:\n"
             f"   • Test (1-35): 1-32 savollarda 4 ta, 33-35 savollarda 6 ta variant\n"
             f"   • Yozma (36-45): Har bir savolda a) va b) qismlari bor\n\n"

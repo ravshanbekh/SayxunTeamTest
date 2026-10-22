@@ -16,6 +16,12 @@ class TestEntryStates(StatesGroup):
     waiting_for_test_code = State()
 
 
+class PaymentStates(StatesGroup):
+    """Balansni to'ldirish: summa va chek (skrinshot yoki PDF)."""
+    waiting_for_amount = State()
+    waiting_for_receipt = State()
+
+
 class ResultStates(StatesGroup):
     """States for viewing results by test code."""
     waiting_for_result_code = State()

@@ -1,12 +1,14 @@
 """
 Admin endpoints - grading, student management, and exports.
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Response, UploadFile, File
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status, Response, UploadFile, File
+from fastapi.responses import FileResponse
+from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from uuid import UUID
-from typing import List
+from typing import Dict, List, Optional
 import os
 
 from app.database import get_db
@@ -365,6 +367,163 @@ async def remove_offline_results(
     await _test_or_404(db, test_id)
     deleted = await delete_offline_results(db, test_id)
     return {"message": f"{deleted} ta offline natija o'chirildi", "deleted": deleted}
+
+
+# ---------------------------------------------------------------------------
+# To'lovlar (cheklar) va balans
+# ---------------------------------------------------------------------------
+
+class ApprovePaymentsRequest(BaseModel):
+    ids: List[UUID] = Field(default_factory=list)
+    amounts: Dict[str, int] = Field(default_factory=dict)  # tasdiqlashdan oldin summani o'zgartirish
+
+
+class RejectPaymentRequest(BaseModel):
+    note: Optional[str] = None
+
+
+class PaymentSettingsUpdate(BaseModel):
+    card_number: Optional[str] = None
+    card_holder: Optional[str] = None
+    note: Optional[str] = None
+
+
+def _notify(messages):
+    from app.services.payment_service import send_telegram_message
+    for chat_id, text in messages:
+        send_telegram_message(chat_id, text)
+
+
+@router.get("/payments")
+async def list_payments(
+    status_filter: str = Query("pending", alias="status"),
+    db: AsyncSession = Depends(get_db),
+    current_admin: AdminUser = Depends(get_current_admin)
+):
+    """Cheklar ro'yxati: pending / approved / rejected / all (admin only)."""
+    from sqlalchemy import func as sa_func
+    from app.models.payment import PaymentRequest
+    from app.models.test import Test
+    from app.services.payment_service import purge_expired_receipts, receipt_expires_at
+
+    await purge_expired_receipts(db)
+
+    counts = {k: 0 for k in ("pending", "approved", "rejected")}
+    for st, cnt in (await db.execute(
+            select(PaymentRequest.status, sa_func.count(PaymentRequest.id)).group_by(PaymentRequest.status))).all():
+        counts[st] = cnt
+
+    stmt = (select(PaymentRequest, User, Test)
+            .join(User, User.id == PaymentRequest.user_id)
+            .outerjoin(Test, Test.id == PaymentRequest.test_id))
+    if status_filter in counts:
+        stmt = stmt.where(PaymentRequest.status == status_filter)
+    order = PaymentRequest.created_at.asc() if status_filter == "pending" else PaymentRequest.created_at.desc()
+    rows = (await db.execute(stmt.order_by(order).limit(1000))).all()
+
+    items = []
+    for payment, user, test in rows:
+        expires = receipt_expires_at(payment, test)
+        items.append({
+            "id": str(payment.id),
+            "status": payment.status,
+            "amount": payment.amount,
+            "created_at": payment.created_at.isoformat() if payment.created_at else None,
+            "reviewed_at": payment.reviewed_at.isoformat() if payment.reviewed_at else None,
+            "note": payment.note,
+            "has_file": bool(payment.file_path),
+            "content_type": payment.content_type,
+            "file_expires_at": expires.isoformat() if expires and payment.file_path else None,
+            "user": {"id": str(user.id), "name": f"{user.full_name} {user.surname}".strip(),
+                     "region": user.region, "telegram_id": user.telegram_id},
+            "test": {"id": str(test.id), "code": test.test_code, "title": test.title,
+                     "price": test.price} if test else None,
+        })
+    return {"counts": counts, "items": items}
+
+
+@router.get("/payments/{payment_id}/file")
+async def payment_file(
+    payment_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_admin: AdminUser = Depends(get_current_admin)
+):
+    """Chek fayli (rasm yoki PDF) - faqat admin uchun."""
+    from app.models.payment import PaymentRequest
+
+    payment = (await db.execute(select(PaymentRequest).where(PaymentRequest.id == payment_id))).scalars().first()
+    if not payment or not payment.file_path or not os.path.exists(payment.file_path):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chek fayli topilmadi yoki o'chirilgan")
+    return FileResponse(payment.file_path, media_type=payment.content_type or "application/octet-stream",
+                        headers={"Cache-Control": "private, no-store"})
+
+
+@router.post("/payments/approve")
+async def approve_selected_payments(
+    body: ApprovePaymentsRequest,
+    background: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    current_admin: AdminUser = Depends(get_current_admin)
+):
+    """Belgilangan cheklarni tasdiqlash (bitta yoki bir nechta)."""
+    from app.services.payment_service import PaymentError, approve_payments, build_review_notifications
+
+    try:
+        approved = await approve_payments(db, body.ids, current_admin.id, body.amounts)
+    except PaymentError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    background.add_task(_notify, await build_review_notifications(db, approved))
+    return {"approved": len(approved), "message": f"{len(approved)} ta to'lov tasdiqlandi"}
+
+
+@router.post("/payments/approve-all")
+async def approve_all_payments(
+    background: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    current_admin: AdminUser = Depends(get_current_admin)
+):
+    """Barcha kutilayotgan cheklarni bittada tasdiqlash."""
+    from app.services.payment_service import approve_all_pending, build_review_notifications
+
+    approved = await approve_all_pending(db, current_admin.id)
+    background.add_task(_notify, await build_review_notifications(db, approved))
+    return {"approved": len(approved), "message": f"{len(approved)} ta to'lov tasdiqlandi"}
+
+
+@router.post("/payments/{payment_id}/reject")
+async def reject_payment_endpoint(
+    payment_id: UUID,
+    body: RejectPaymentRequest,
+    background: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    current_admin: AdminUser = Depends(get_current_admin)
+):
+    from app.services.payment_service import build_review_notifications, reject_payment
+
+    payment = await reject_payment(db, payment_id, current_admin.id, body.note)
+    if not payment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Kutilayotgan to'lov topilmadi")
+    background.add_task(_notify, await build_review_notifications(db, [payment]))
+    return {"message": "To'lov rad etildi"}
+
+
+@router.get("/payment-settings")
+async def get_payment_settings_endpoint(
+    db: AsyncSession = Depends(get_db),
+    current_admin: AdminUser = Depends(get_current_admin)
+):
+    from app.services.payment_service import get_payment_settings
+    return await get_payment_settings(db)
+
+
+@router.put("/payment-settings")
+async def update_payment_settings_endpoint(
+    body: PaymentSettingsUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_admin: AdminUser = Depends(get_current_admin)
+):
+    from app.services.payment_service import save_payment_settings
+    return await save_payment_settings(db, body.model_dump())
 
 
 @router.delete("/sessions/{test_id}", status_code=status.HTTP_200_OK)

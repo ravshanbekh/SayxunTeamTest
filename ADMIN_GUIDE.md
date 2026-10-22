@@ -119,3 +119,33 @@ va **umumiy Rasch hisobiga** kiradi.
 Rasch hisobotida (PDF/Excel) onlayn va offline talabalar bitta jadvalda chiqadi. PDF sarlavhasida ularning soni
 alohida ko'rsatiladi, Excel'dagi `Manba` ustunida esa har bir talaba onlayn yoki offline ekani yoziladi.
 Botda onlayn talabaning o'rni ham offline talabalar bilan birga hisoblanadi.
+
+## Pullik testlar va to'lovlar
+
+**Test narxi.** Test yaratish/tahrirlash oynasida "Pullik test" belgilansa va narx kiritilsa, talaba testga
+kirishi uchun balansida shu summa bo'lishi kerak. Belgi olib tashlansa test bepul bo'ladi va bot balans haqida
+umuman so'ramaydi. Eski testlar avtomatik bepul.
+
+**Karta rekvizitlari.** "To'lovlar" sahifasidagi "To'lov kartasi rekvizitlari" bo'limiga karta raqami, karta
+egasi va (ixtiyoriy) izoh kiriting. Bot talabalarga aynan shu ma'lumotni ko'rsatadi.
+
+**Talaba tomoni (bot):**
+1. Talaba test kodini yuboradi. Test pullik va balans yetmasa, bot narx, balans, karta raqami va
+   to'lanadigan summani ko'rsatadi.
+2. Talaba pul o'tkazib, chek skrinshotini (rasm) yoki PDF chekni botga yuboradi.
+3. Admin tasdiqlagach, talabaga "To'lovingiz tasdiqlandi" xabari keladi; u test kodini qayta yuboradi va
+   testga kiradi. Narx balansdan bir marta yechiladi (sessiya tozalanib qayta kirilsa qayta yechilmaydi).
+4. Bosh menyudagi "💳 Balans" tugmasi orqali balansni ko'rish va oldindan to'ldirish ham mumkin.
+
+**Admin tomoni (sayt, "To'lovlar" sahifasi):**
+- "Kutilmoqda" ro'yxatida har bir chek: rasm yoki PDF, talaba, test, summa. Chekni bosib kattalashtirib ko'rish mumkin.
+- Summani tasdiqlashdan oldin o'zgartirish mumkin (masalan, talaba kamroq o'tkazgan bo'lsa).
+- Tasdiqlash: bittalab ("Tasdiqlash"), belgilanganlarni ("Belgilanganlarni tasdiqlash") yoki hammasini bittada
+  ("Hammasini tasdiqlash"). "Rad etish"da sababni yozsangiz, u talabaga yuboriladi.
+- Yon menyudagi "To'lovlar" yonida tekshirilmagan cheklar soni ko'rinadi.
+
+**Cheklar qancha saqlanadi:** testga bog'langan chek o'sha test tugaguncha saqlanadi, test tugagach saytdan
+avtomatik o'chiriladi (to'lov yozuvi va summa qoladi). Testga bog'lanmagan (balansni to'ldirish) cheklar ko'rib
+chiqilgandan 7 kun keyin o'chiriladi (`RECEIPT_RETENTION_DAYS`). Tekshirilmagan cheklar o'chirilmaydi.
+
+Talabaga tasdiq/rad xabari borishi uchun serverdagi `.env` faylida `BOT_TOKEN` bo'lishi yetarli (backend ham undan foydalanadi).

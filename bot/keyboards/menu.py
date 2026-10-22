@@ -10,8 +10,9 @@ def get_main_menu() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="🚀 Testni boshlash", callback_data="start_test")],
         [
             InlineKeyboardButton(text="📊 Natijalarim", callback_data="my_results"),
-            InlineKeyboardButton(text="📈 Test tahlili", callback_data="test_analytics")
+            InlineKeyboardButton(text="💳 Balans", callback_data="balance")
         ],
+        [InlineKeyboardButton(text="📈 Test tahlili", callback_data="test_analytics")],
     ])
 
 

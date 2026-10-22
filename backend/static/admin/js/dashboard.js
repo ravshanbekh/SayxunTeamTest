@@ -48,6 +48,7 @@ document.querySelectorAll('.menu a[data-page]').forEach(link => {
         if (page === 'tests') loadTests();
         if (page === 'prezident') loadPrezidentTests();
         if (page === 'admins') loadAdmins();
+        if (page === 'payments') loadPayments();
     });
 });
 
@@ -55,6 +56,7 @@ document.querySelectorAll('.menu a[data-page]').forEach(link => {
 // DASHBOARD
 // ==========================================
 async function loadDashboard() {
+    refreshPaymentsBadge();
     try {
         const [students, sertifikat, prezident] = await Promise.all([
             apiRequest('/api/v1/admin/students?limit=5000').then(r => r.json()),
@@ -182,6 +184,7 @@ function buildTestCard(test) {
                     <h3>${escapeHtml(test.title)}</h3>
                     <div class="test-meta">
                         <span>Kod <span class="test-code">${escapeHtml(test.test_code)}</span></span>
+                        <span class="price-chip ${test.price > 0 ? 'is-paid' : ''}">${test.price > 0 ? formatSum(test.price) : 'Bepul'}</span>
                         <span>${icon('calendar')} ${formatDateTime(test.start_time)} — ${formatDateTime(test.end_time)}</span>
                         ${test.extra_minutes > 0 ? `<span>${icon('clock')} +${test.extra_minutes} daqiqa qo'shilgan</span>` : ''}
                     </div>
@@ -441,6 +444,7 @@ async function openEditModal(testId, testType) {
             document.getElementById('edit-prez-test-active').checked = test.is_active;
             document.getElementById('edit-prez-test-start-time').value = toDatetimeLocal(test.start_time);
             document.getElementById('edit-prez-test-end-time').value = toDatetimeLocal(test.end_time);
+            fillPrice('edit-prez-test', test.price);
 
             // 40 MCQ (A-D)
             let mcqGrid = '';
@@ -462,6 +466,7 @@ async function openEditModal(testId, testType) {
             document.getElementById('edit-test-active').checked = test.is_active;
             document.getElementById('edit-test-start-time').value = toDatetimeLocal(test.start_time);
             document.getElementById('edit-test-end-time').value = toDatetimeLocal(test.end_time);
+            fillPrice('edit-test', test.price);
 
             let mcqGrid = '';
             for (let i = 1; i <= 35; i++) {
@@ -540,6 +545,7 @@ document.getElementById('edit-test-form').addEventListener('submit', async (e) =
         is_active: document.getElementById('edit-test-active').checked,
         start_time: document.getElementById('edit-test-start-time').value || null,
         end_time: document.getElementById('edit-test-end-time').value || null,
+        price: readPrice('edit-test'),
         answer_key: { mcq_answers: mcqAnswers, written_questions: writtenQuestions }
     };
 
@@ -572,6 +578,7 @@ document.getElementById('edit-prezident-form').addEventListener('submit', async 
         is_active: document.getElementById('edit-prez-test-active').checked,
         start_time: document.getElementById('edit-prez-test-start-time').value || null,
         end_time: document.getElementById('edit-prez-test-end-time').value || null,
+        price: readPrice('edit-prez-test'),
         answer_key: { mcq_answers: mcqAnswers, written_questions: {} }
     };
 
@@ -612,6 +619,7 @@ document.getElementById('create-test-btn').addEventListener('click', () => {
 
     document.getElementById('mcq-answers-grid').innerHTML = mcqGrid + openEndedHTML;
     document.getElementById('create-test-form').reset();
+    fillPrice('test', 0);
     document.getElementById('create-test-modal').classList.remove('hidden');
 });
 
@@ -642,6 +650,7 @@ document.getElementById('create-test-form').addEventListener('submit', async (e)
         start_time: document.getElementById('test-start-time').value || null,
         end_time: document.getElementById('test-end-time').value || null,
         test_type: 'sertifikat',
+        price: readPrice('test'),
         answer_key: { mcq_answers: mcqAnswers, written_questions: writtenQuestions }
     };
 
@@ -668,6 +677,7 @@ document.getElementById('create-prezident-btn').addEventListener('click', () => 
 
     document.getElementById('prez-mcq-answers-grid').innerHTML = mcqGrid;
     document.getElementById('create-prezident-form').reset();
+    fillPrice('prez-test', 0);
     document.getElementById('create-prezident-modal').classList.remove('hidden');
 });
 
@@ -690,6 +700,7 @@ document.getElementById('create-prezident-form').addEventListener('submit', asyn
         start_time: document.getElementById('prez-test-start-time').value || null,
         end_time: document.getElementById('prez-test-end-time').value || null,
         test_type: 'prezident',
+        price: readPrice('prez-test'),
         answer_key: { mcq_answers: mcqAnswers, written_questions: {} }
     };
 
@@ -763,3 +774,289 @@ document.getElementById('add-admin-form').addEventListener('submit', async (e) =
         alert('❌ Xatolik: ' + error.message);
     }
 });
+
+// ==========================================
+// NARX (pullik / bepul test)
+// ==========================================
+function formatSum(value) {
+    return `${Number(value || 0).toLocaleString('ru-RU').replace(/,/g, ' ')} so'm`;
+}
+
+function fillPrice(prefix, price) {
+    const paid = document.getElementById(`${prefix}-paid`);
+    const input = document.getElementById(`${prefix}-price`);
+    paid.checked = Number(price) > 0;
+    input.value = Number(price) > 0 ? price : '';
+    input.disabled = !paid.checked;
+}
+
+function readPrice(prefix) {
+    const paid = document.getElementById(`${prefix}-paid`).checked;
+    const value = parseInt(document.getElementById(`${prefix}-price`).value, 10);
+    return paid && value > 0 ? value : 0;
+}
+
+['test', 'edit-test', 'prez-test', 'edit-prez-test'].forEach(prefix => {
+    const paid = document.getElementById(`${prefix}-paid`);
+    const input = document.getElementById(`${prefix}-price`);
+    paid.addEventListener('change', () => {
+        input.disabled = !paid.checked;
+        if (paid.checked) input.focus();
+    });
+});
+
+// ==========================================
+// TO'LOVLAR (cheklar)
+// ==========================================
+let paymentStatus = 'pending';
+let paymentItems = [];
+const receiptUrls = new Map();   // payment id -> blob URL (rasm/PDF)
+
+async function fetchReceipt(id) {
+    if (receiptUrls.has(id)) return receiptUrls.get(id);
+    const response = await fetch(`${API_BASE}/api/v1/admin/payments/${id}/file`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` },
+        cache: 'no-store'
+    });
+    if (!response.ok) throw new Error('Chek fayli topilmadi yoki o\'chirilgan');
+    const url = URL.createObjectURL(await response.blob());
+    receiptUrls.set(id, url);
+    return url;
+}
+
+function updatePaymentsBadge(pending) {
+    const badge = document.getElementById('payments-badge');
+    badge.textContent = pending;
+    badge.classList.toggle('hidden', !pending);
+}
+
+async function refreshPaymentsBadge() {
+    try {
+        const data = await (await apiRequest('/api/v1/admin/payments?status=pending')).json();
+        updatePaymentsBadge(data.counts.pending);
+    } catch (e) { /* jim */ }
+}
+
+async function loadPaymentSettings() {
+    try {
+        const s = await (await apiRequest('/api/v1/admin/payment-settings')).json();
+        document.getElementById('pay-card-number').value = s.card_number || '';
+        document.getElementById('pay-card-holder').value = s.card_holder || '';
+        document.getElementById('pay-note').value = s.note || '';
+        const details = document.getElementById('pay-settings');
+        if (!s.card_number) details.open = true;
+    } catch (e) { console.error(e); }
+}
+
+async function loadPayments() {
+    loadPaymentSettings();
+    const list = document.getElementById('payments-list');
+    try {
+        const data = await (await apiRequest(`/api/v1/admin/payments?status=${paymentStatus}`)).json();
+        paymentItems = data.items;
+        ['pending', 'approved', 'rejected'].forEach(k => {
+            document.getElementById(`count-${k}`).textContent = data.counts[k];
+        });
+        updatePaymentsBadge(data.counts.pending);
+        renderPayments();
+    } catch (error) {
+        list.innerHTML = `<div class="empty-state"><h3>Ro'yxat yuklanmadi</h3><p>${escapeHtml(error.message)}</p></div>`;
+    }
+}
+
+function paymentStatusLabel(item) {
+    if (item.status === 'approved') return '<span class="status is-on">Tasdiqlangan</span>';
+    if (item.status === 'rejected') return '<span class="status is-off">Rad etilgan</span>';
+    return '<span class="status is-wait">Kutilmoqda</span>';
+}
+
+function renderPayments() {
+    const list = document.getElementById('payments-list');
+    const pending = paymentStatus === 'pending';
+    document.getElementById('pay-bulk').classList.toggle('hidden', !pending || !paymentItems.length);
+    document.getElementById('pay-select-all').checked = false;
+    updateSelectedButton();
+
+    if (!paymentItems.length) {
+        const texts = {
+            pending: ["Tekshiriladigan chek yo'q", "Talabalar botga chek yuborganda ular shu yerda paydo bo'ladi."],
+            approved: ["Tasdiqlangan to'lov yo'q", "Tasdiqlangan cheklar shu yerda ko'rinadi."],
+            rejected: ["Rad etilgan to'lov yo'q", "Rad etilgan cheklar shu yerda ko'rinadi."],
+        }[paymentStatus];
+        list.innerHTML = `<div class="empty-state"><img class="illus" src="../brand/icon-exam.webp" alt=""><h3>${texts[0]}</h3><p>${texts[1]}</p></div>`;
+        return;
+    }
+
+    list.innerHTML = `<div class="pay-list">${paymentItems.map(item => {
+        const test = item.test ? `<span><span class="test-code">${escapeHtml(item.test.code)}</span> ${escapeHtml(item.test.title)}</span>` : '<span class="muted">Balansni to\'ldirish</span>';
+        const thumb = item.has_file
+            ? (item.content_type === 'application/pdf'
+                ? `<button class="pay-thumb is-pdf" onclick="openReceipt('${item.id}')" aria-label="Chekni ko'rish">PDF</button>`
+                : `<button class="pay-thumb" onclick="openReceipt('${item.id}')" aria-label="Chekni ko'rish"><img data-receipt="${item.id}" alt=""></button>`)
+            : `<span class="pay-thumb is-gone" title="Chek o'chirilgan">—</span>`;
+        const amount = pending
+            ? `<label class="amount-input"><input type="number" min="1000" step="1000" value="${item.amount}" data-amount="${item.id}"> so'm</label>`
+            : `<b>${formatSum(item.amount)}</b>`;
+        const created = formatDateTime(item.created_at);
+        const keep = item.file_expires_at ? `<small class="muted">Chek ${formatDateTime(item.file_expires_at)} gacha saqlanadi</small>` : '';
+        return `
+            <div class="pay-row" data-id="${item.id}">
+                ${pending ? `<input type="checkbox" class="pay-check" value="${item.id}" aria-label="Belgilash">` : '<span></span>'}
+                ${thumb}
+                <div class="pay-who">
+                    <b>${escapeHtml(item.user.name)}</b>
+                    <small>${escapeHtml(item.user.region || '')} · Telegram ID ${item.user.telegram_id}</small>
+                </div>
+                <div class="pay-test">${test}<small class="muted">${created}</small>${keep}</div>
+                <div class="pay-amount">${amount}${item.note ? `<small class="muted">Sabab: ${escapeHtml(item.note)}</small>` : ''}</div>
+                <div class="pay-actions">
+                    ${pending ? `
+                        <button class="btn is-strong" onclick="approvePayments(['${item.id}'])">Tasdiqlash</button>
+                        <button class="btn is-danger" onclick="rejectPayment('${item.id}')">Rad etish</button>`
+                      : paymentStatusLabel(item)}
+                </div>
+            </div>`;
+    }).join('')}</div>`;
+
+    // Rasm cheklar uchun kichik ko'rinish
+    list.querySelectorAll('img[data-receipt]').forEach(async img => {
+        try { img.src = await fetchReceipt(img.dataset.receipt); } catch (e) { img.alt = '—'; }
+    });
+    list.querySelectorAll('.pay-check').forEach(cb => cb.addEventListener('change', updateSelectedButton));
+}
+
+function selectedPaymentIds() {
+    return [...document.querySelectorAll('.pay-check:checked')].map(cb => cb.value);
+}
+
+function updateSelectedButton() {
+    const n = selectedPaymentIds().length;
+    const btn = document.getElementById('pay-approve-selected');
+    btn.disabled = n === 0;
+    btn.textContent = n ? `Belgilanganlarni tasdiqlash (${n})` : 'Belgilanganlarni tasdiqlash';
+}
+
+function collectAmounts(ids) {
+    const amounts = {};
+    ids.forEach(id => {
+        const input = document.querySelector(`input[data-amount="${id}"]`);
+        const item = paymentItems.find(p => p.id === id);
+        if (input && item && Number(input.value) !== item.amount) amounts[id] = Number(input.value);
+    });
+    return amounts;
+}
+
+async function approvePayments(ids) {
+    if (!ids.length) return;
+    const total = ids.reduce((sum, id) => {
+        const input = document.querySelector(`input[data-amount="${id}"]`);
+        return sum + Number(input ? input.value : 0);
+    }, 0);
+    if (ids.length > 1 && !confirm(`${ids.length} ta to'lov (${formatSum(total)}) tasdiqlansinmi?`)) return;
+    try {
+        const response = await apiRequest('/api/v1/admin/payments/approve', {
+            method: 'POST', body: JSON.stringify({ ids, amounts: collectAmounts(ids) })
+        });
+        const data = await response.json();
+        closeReceipt();
+        await loadPayments();
+        if (ids.length > 1) alert(data.message);
+    } catch (error) {
+        alert('Xatolik: ' + error.message);
+    }
+}
+
+async function approveAllPayments() {
+    const n = Number(document.getElementById('count-pending').textContent);
+    if (!n || !confirm(`Kutilayotgan barcha ${n} ta to'lov tasdiqlansinmi?`)) return;
+    try {
+        const data = await (await apiRequest('/api/v1/admin/payments/approve-all', { method: 'POST' })).json();
+        await loadPayments();
+        alert(data.message);
+    } catch (error) {
+        alert('Xatolik: ' + error.message);
+    }
+}
+
+async function rejectPayment(id) {
+    const note = prompt("Rad etish sababi (talabaga yuboriladi, ixtiyoriy):", '');
+    if (note === null) return;
+    try {
+        await apiRequest(`/api/v1/admin/payments/${id}/reject`, { method: 'POST', body: JSON.stringify({ note }) });
+        closeReceipt();
+        await loadPayments();
+    } catch (error) {
+        alert('Xatolik: ' + error.message);
+    }
+}
+
+let openedReceiptId = null;
+
+async function openReceipt(id) {
+    const item = paymentItems.find(p => p.id === id);
+    if (!item) return;
+    openedReceiptId = id;
+    const view = document.getElementById('receipt-view');
+    view.innerHTML = '<p class="muted">Yuklanmoqda…</p>';
+    document.getElementById('receipt-heading').textContent = `${item.user.name} — ${formatSum(item.amount)}`;
+    document.getElementById('receipt-meta').textContent =
+        `${item.test ? item.test.code + ' · ' + item.test.title : "Balansni to'ldirish"} · ${formatDateTime(item.created_at)}`;
+    const pending = item.status === 'pending';
+    document.getElementById('receipt-approve').classList.toggle('hidden', !pending);
+    document.getElementById('receipt-reject').classList.toggle('hidden', !pending);
+    document.getElementById('receipt-modal').classList.remove('hidden');
+    try {
+        const url = await fetchReceipt(id);
+        view.innerHTML = item.content_type === 'application/pdf'
+            ? `<iframe src="${url}" title="PDF chek"></iframe><a class="btn" href="${url}" target="_blank" rel="noopener">PDF'ni yangi oynada ochish</a>`
+            : `<img src="${url}" alt="To'lov cheki">`;
+    } catch (error) {
+        view.innerHTML = `<p class="muted">${escapeHtml(error.message)}</p>`;
+    }
+}
+
+function closeReceipt() {
+    openedReceiptId = null;
+    document.getElementById('receipt-modal').classList.add('hidden');
+}
+
+document.getElementById('receipt-close').addEventListener('click', closeReceipt);
+document.getElementById('receipt-approve').addEventListener('click', () => openedReceiptId && approvePayments([openedReceiptId]));
+document.getElementById('receipt-reject').addEventListener('click', () => openedReceiptId && rejectPayment(openedReceiptId));
+document.getElementById('pay-approve-selected').addEventListener('click', () => approvePayments(selectedPaymentIds()));
+document.getElementById('pay-approve-all').addEventListener('click', approveAllPayments);
+document.getElementById('pay-select-all').addEventListener('change', (e) => {
+    document.querySelectorAll('.pay-check').forEach(cb => { cb.checked = e.target.checked; });
+    updateSelectedButton();
+});
+document.querySelectorAll('.tabs .tab').forEach(tab => tab.addEventListener('click', () => {
+    document.querySelectorAll('.tabs .tab').forEach(t => t.classList.remove('is-active'));
+    tab.classList.add('is-active');
+    paymentStatus = tab.dataset.status;
+    loadPayments();
+}));
+document.getElementById('pay-settings-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+        await apiRequest('/api/v1/admin/payment-settings', {
+            method: 'PUT',
+            body: JSON.stringify({
+                card_number: document.getElementById('pay-card-number').value,
+                card_holder: document.getElementById('pay-card-holder').value,
+                note: document.getElementById('pay-note').value,
+            })
+        });
+        alert("Rekvizitlar saqlandi. Bot talabalarga shu kartani ko'rsatadi.");
+    } catch (error) {
+        alert('Xatolik: ' + error.message);
+    }
+});
+
+window.openReceipt = openReceipt;
+window.approvePayments = approvePayments;
+window.rejectPayment = rejectPayment;
+
+if (isLoggedIn()) {
+    refreshPaymentsBadge();
+}
+setInterval(() => { if (isLoggedIn()) refreshPaymentsBadge(); }, 60000);

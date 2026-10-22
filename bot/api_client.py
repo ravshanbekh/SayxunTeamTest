@@ -84,6 +84,10 @@ class APIClient:
         }
         
         async with session.post(url, json=data) as response:
+            if response.status == 402:
+                # Pullik test: balans yetarli emas
+                error_data = await response.json()
+                return {"error": "PAYMENT_REQUIRED", "payment_required": error_data.get("detail", {})}
             if response.status == 400:
                 try:
                     error_data = await response.json()
@@ -133,6 +137,43 @@ class APIClient:
         }
         
         async with session.put(url, json=data) as response:
+            response.raise_for_status()
+            return await response.json()
+
+
+    # --- To'lov endpointlari ---
+
+    async def get_payment_info(self) -> Dict:
+        session = await self._get_session()
+        async with session.get(f"{self.base_url}/api/v1/payments/info") as response:
+            response.raise_for_status()
+            return await response.json()
+
+    async def get_balance(self, telegram_id: int) -> Optional[Dict]:
+        session = await self._get_session()
+        async with session.get(f"{self.base_url}/api/v1/payments/balance/{telegram_id}") as response:
+            if response.status == 404:
+                return None
+            response.raise_for_status()
+            return await response.json()
+
+    async def submit_payment(self, telegram_id: int, amount: int, content: bytes, filename: str,
+                             content_type: str, test_id: Optional[str] = None) -> Dict:
+        """Chekni yuborish. Muvaffaqiyatda {"id": ...}, xatoda {"error": "..."}"""
+        session = await self._get_session()
+        form = aiohttp.FormData()
+        form.add_field("telegram_id", str(telegram_id))
+        form.add_field("amount", str(amount))
+        if test_id:
+            form.add_field("test_id", str(test_id))
+        form.add_field("file", content, filename=filename, content_type=content_type)
+        async with session.post(f"{self.base_url}/api/v1/payments/submit", data=form) as response:
+            if response.status in (400, 404):
+                try:
+                    data = await response.json()
+                    return {"error": data.get("detail", "Xatolik")}
+                except Exception:
+                    return {"error": "Xatolik"}
             response.raise_for_status()
             return await response.json()
 

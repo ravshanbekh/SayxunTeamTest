@@ -26,6 +26,7 @@ class Test(Base):
     end_time = Column(DateTime, nullable=True)       # Test tugash vaqti
     extra_minutes = Column(Integer, default=0, nullable=False)  # Admin qo'shgan daqiqalar (max 15)
     test_type = Column(String(20), default='sertifikat', nullable=False)  # 'sertifikat' or 'prezident'
+    price = Column(Integer, default=0, nullable=False)  # so'm; 0 - bepul test
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     
     # Relationships
@@ -58,3 +59,4 @@ class AnswerKey(Base):
 
 
 from app.models.offline import OfflineResult  # noqa: E402,F401 - relationship uchun ro'yxatdan o'tkazish
+from app.models import payment  # noqa: E402,F401 - to'lov jadvallarini ro'yxatdan o'tkazish

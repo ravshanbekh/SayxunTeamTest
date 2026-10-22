@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     # Session
     SESSION_DURATION_MINUTES: int = 90
     
+    # To'lovlar: tasdiq/rad haqida talabaga bot orqali xabar yuborish uchun (ixtiyoriy)
+    BOT_TOKEN: Optional[str] = None
+    # Testga bog'lanmagan cheklar ko'rib chiqilgandan keyin necha kun saqlanadi
+    RECEIPT_RETENTION_DAYS: int = 7
+    
     # Rasch: T-ballni yuqoridan cheklash (bo'sh - cheklanmaydi, masalan 75)
     RASCH_MAX_SCORE: Optional[float] = None
 

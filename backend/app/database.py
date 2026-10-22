@@ -82,6 +82,8 @@ async def init_db():
                 "ALTER TABLE tests ADD COLUMN IF NOT EXISTS extra_minutes INTEGER DEFAULT 0",
                 # Test table - test type column (sertifikat or prezident)
                 "ALTER TABLE tests ADD COLUMN IF NOT EXISTS test_type VARCHAR(20) DEFAULT 'sertifikat' NOT NULL",
+                # Test table - narx (0 - bepul)
+                "ALTER TABLE tests ADD COLUMN IF NOT EXISTS price INTEGER DEFAULT 0 NOT NULL",
                 # TestSession table - per-session extension tracking
                 "ALTER TABLE test_sessions ADD COLUMN IF NOT EXISTS extra_minutes INTEGER DEFAULT 0",
             ]

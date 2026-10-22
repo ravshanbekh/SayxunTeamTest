@@ -35,6 +35,17 @@ async def start_session(
             detail="User has already attempted this test"
         )
     
+    # Pullik test: balans yetarli bo'lmasa 402 (bot talabaga to'lov yo'riqnomasini ko'rsatadi)
+    from sqlalchemy import select
+    from app.models.test import Test
+    from app.services.payment_service import check_test_access, charge_for_test
+
+    test = (await db.execute(select(Test).where(Test.id == session_data.test_id))).scalars().first()
+    if test is not None:
+        shortage = await check_test_access(db, session_data.user_id, test)
+        if shortage:
+            raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail=shortage)
+
     try:
         session = await create_session(db, session_data.user_id, session_data.test_id)
     except ValueError as e:
@@ -60,6 +71,9 @@ async def start_session(
             detail="Could not create session"
         )
     
+    if test is not None:
+        await charge_for_test(db, session_data.user_id, test)
+
     return SessionResponse.model_validate(session)
 
 
