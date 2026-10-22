@@ -352,6 +352,15 @@ def _brand_image(name: str) -> Optional[str]:
     return path if os.path.exists(path) else None
 
 
+def _fit_text(text: str, font: str, size: float, width: float) -> str:
+    """Matn ustunga sig'masa, oxirini "…" bilan qisqartirish."""
+    if pdfmetrics.stringWidth(text, font, size) <= width:
+        return text
+    while text and pdfmetrics.stringWidth(text + "…", font, size) > width:
+        text = text[:-1]
+    return text.rstrip() + "…"
+
+
 def export_rasch_to_pdf(report: RaschReport, filepath: str) -> str:
     regular, bold = _register_fonts()
     os.makedirs(os.path.dirname(filepath) or ".", exist_ok=True)
@@ -441,12 +450,9 @@ def export_rasch_to_pdf(report: RaschReport, filepath: str) -> str:
     ])
 
     styles = getSampleStyleSheet()
-    note_style = ParagraphStyle("RaschNote", parent=styles["Normal"], fontName=regular,
-                                fontSize=7, textColor=colors.HexColor(BRAND_MUTED), leading=9.5)
     section_style = ParagraphStyle("RaschSection", parent=styles["Normal"], fontName=bold,
                                    fontSize=9.5, textColor=colors.HexColor(BRAND_DARK), spaceAfter=6)
 
-    analysis = report.analysis
     sources = report.source_counts()
 
     # Asosiy ma'lumotlar: yorliq + qiymat
@@ -502,8 +508,9 @@ def export_rasch_to_pdf(report: RaschReport, filepath: str) -> str:
         col_widths = [28, 165, 46, 52, 54, 48, 60, 60]
         header_spans = []
     head_n = len(header_rows)
+    name_width = col_widths[1] - 8  # chap/o'ng ichki bo'shliq
     data = header_rows + [
-        [row[0], _pdf_safe(row[1])] + row[2:] for row in table_rows(report)
+        [row[0], _fit_text(_pdf_safe(row[1]), regular, 8, name_width)] + row[2:] for row in table_rows(report)
     ]
     table = Table(data, colWidths=col_widths, repeatRows=head_n)
 
@@ -554,19 +561,6 @@ def export_rasch_to_pdf(report: RaschReport, filepath: str) -> str:
     summary_table.hAlign = "LEFT"
     elements.append(summary_table)
 
-    rel = f"{analysis.reliability:.2f}" if analysis.reliability is not None else "-"
-    elements.append(Spacer(1, 10))
-    elements.append(Paragraph(
-        "Ballar Rasch modeli (CML + WLE) asosida hisoblangan: T = 50 + 10·Z (shartli maksimal 75, undan yuqori ham bo'lishi mumkin). "
-        "Darajalar: A+ ≥70, A ≥65, B+ ≥60, B ≥55, C+ ≥50, C ≥46. "
-        "Foiz: A+/A – 100%, qolganlari ball/65. 1-Fan = foiz·93 + 11, 2-Fan = foiz·63 + 11 "
-        f"(majburiy fan 11 ball). Ishonchlilik (reliability): {rel}."
-        + (" Rash ball algebra va geometriya qismlariga talaba to'g'ri yechgan savollarning Rasch qiyinligiga "
-           "proporsional bo'lingan (algebra + geometriya = jami)." if report.has_sections else ""),
-        note_style,
-    ))
-    for warning in analysis.warnings:
-        elements.append(Paragraph(f"⚠ {warning}", note_style))
 
     doc.build(elements)
     return filepath
