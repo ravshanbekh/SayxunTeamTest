@@ -193,6 +193,8 @@ async def get_rasch_results(
                 "correct": r.correct,
                 "algebra": r.algebra,
                 "geometry": r.geometry,
+                "rasch_algebra": r.score_algebra,
+                "rasch_geometry": r.score_geometry,
                 "theta": round(r.theta, 4),
                 "rasch_score": r.score,
                 "percent": r.percent,

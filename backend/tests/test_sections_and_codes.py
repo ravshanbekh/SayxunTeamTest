@@ -6,6 +6,7 @@ from openpyxl import load_workbook
 
 from app.services.rasch_report_service import (
     build_rasch_report, export_rasch_to_excel, export_rasch_to_pdf, item_labels_for, section_for_label,
+    split_score_by_section,
 )
 from tests.test_rasch_report import _create_test, db  # noqa: F401 - fixture
 
@@ -38,6 +39,15 @@ async def test_report_sections_sum_to_total(db, tmp_path):  # noqa: F811
     for row in report.rows:
         assert row.algebra + row.geometry == row.correct
         assert row.geometry == sum(v for v, l in zip(row.item_values, labels) if l in GEOMETRY)
+
+    for row in report.rows:
+        # Rasch balining qismlari yig'indisi aynan umumiy ballga teng
+        assert round(row.score_algebra + row.score_geometry, 2) == row.score
+        assert row.score_algebra >= 0 and row.score_geometry >= 0
+        if row.geometry == 0 and row.correct > 0:
+            assert row.score_geometry == 0
+        if row.algebra == 0 and row.correct > 0:
+            assert row.score_algebra == 0
 
     pdf = export_rasch_to_pdf(report, str(tmp_path / "r.pdf"))
     with open(pdf, "rb") as f:
@@ -98,3 +108,39 @@ async def test_duplicate_test_code_returns_400(db):  # noqa: F811
         r = await client.patch(f"/api/v1/tests/{first_id}", json={"test_code": "MAT1", "title": "Yangi nom"},
                                headers=headers)
         assert r.status_code == 200 and r.json()["title"] == "Yangi nom"
+
+
+SECTIONS = [section_for_label(l) for l in item_labels_for("sertifikat")]
+
+
+@pytest.mark.parametrize("score", [0.0, 12.5, 46.0, 64.73, 75.0, 89.56])
+def test_split_sums_to_total(score):
+    import random
+    rng = random.Random(int(score * 100))
+    values = [rng.randint(0, 1) for _ in SECTIONS]
+    weights = [rng.uniform(0.05, 0.95) for _ in SECTIONS]
+    parts = split_score_by_section(score, values, SECTIONS, weights)
+    assert round(parts["Algebra"] + parts["Geometriya"], 2) == round(score, 2)
+
+
+def test_split_harder_items_weigh_more():
+    values = [0] * len(SECTIONS)
+    a = SECTIONS.index("Algebra")
+    g = SECTIONS.index("Geometriya")
+    values[a] = values[g] = 1
+    weights = [0.5] * len(SECTIONS)
+    weights[g] = 0.9   # geometriya savoli qiyinroq
+    weights[a] = 0.3
+    parts = split_score_by_section(60.0, values, SECTIONS, weights)
+    assert parts["Geometriya"] == 45.0 and parts["Algebra"] == 15.0
+
+
+def test_split_without_correct_answers_uses_section_sizes():
+    parts = split_score_by_section(55.0, [0] * len(SECTIONS), SECTIONS, [0.5] * len(SECTIONS))
+    assert parts == {"Algebra": 36.0, "Geometriya": 19.0}
+
+
+def test_split_only_one_section_correct():
+    values = [1 if s == "Algebra" else 0 for s in SECTIONS]
+    parts = split_score_by_section(48.2, values, SECTIONS, [0.5] * len(SECTIONS))
+    assert parts == {"Algebra": 48.2, "Geometriya": 0.0}

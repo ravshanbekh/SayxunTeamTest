@@ -262,6 +262,8 @@ async def get_user_result_by_test_code(
                     "total_items": len(report.item_labels),
                     "algebra": row.algebra,
                     "geometry": row.geometry,
+                    "score_algebra": row.score_algebra,
+                    "score_geometry": row.score_geometry,
                     "section_totals": report.section_totals(),
                     "score": row.score,
                     "percent": row.percent,

@@ -7,6 +7,7 @@ from typing import Dict, List, Optional
 from uuid import UUID
 from datetime import datetime
 import json
+import math
 import logging
 import os
 import time
@@ -61,6 +62,31 @@ GEOMETRY_QUESTIONS = set(range(23, 31)) | {33, 34, 35} | set(range(41, 45))
 SECTION_NAMES = ("Algebra", "Geometriya")
 
 
+def split_score_by_section(score: float, item_values: List[int], sections: List[str],
+                           weights: List[float]) -> Dict[str, float]:
+    """
+    Umumiy Rasch balini bo'limlarga ajratish (algebra + geometriya = umumiy ball).
+
+    Rasch modeli bitta umumiy ball beradi; uni bo'lish uchun ball talaba to'g'ri
+    yechgan topshiriqlar orasida ularning qiyinlik vazniga proporsional taqsimlanadi.
+    Vazn - o'rtacha qatnashchining shu topshiriqda xato qilish ehtimoli (Rasch qiyinligidan),
+    ya'ni qiyinroq savol ko'proq ulush oladi. Birorta ham to'g'ri javob bo'lmasa,
+    ball bo'limlardagi topshiriqlar soniga proporsional bo'linadi.
+    """
+    from app.services.rasch_service import round2
+
+    totals = {name: 0.0 for name in SECTION_NAMES}
+    for value, section, weight in zip(item_values, sections, weights):
+        if value:
+            totals[section] += weight
+    if sum(totals.values()) <= 0:
+        for section in sections:
+            totals[section] += 1.0
+    whole = sum(totals.values())
+    first = round2(score * totals[SECTION_NAMES[0]] / whole)
+    return {SECTION_NAMES[0]: first, SECTION_NAMES[1]: round2(score - first)}
+
+
 def section_for_label(label: str) -> str:
     """'27' yoki '42b' -> 'Geometriya', '5' yoki '36a' -> 'Algebra'."""
     digits = "".join(ch for ch in str(label) if ch.isdigit())
@@ -85,6 +111,8 @@ class RaschRow:
     source: str = "online"  # "online" yoki "offline"
     algebra: Optional[int] = None     # algebra bo'limidagi to'g'ri javoblar
     geometry: Optional[int] = None    # geometriya bo'limidagi to'g'ri javoblar
+    score_algebra: Optional[float] = None   # Rasch ballining algebra qismi
+    score_geometry: Optional[float] = None  # Rasch ballining geometriya qismi
 
 
 @dataclass
@@ -108,7 +136,8 @@ class RaschReport:
     def headers(self) -> List[str]:
         if not self.has_sections:
             return list(HEADERS)
-        return HEADERS[:3] + list(SECTION_NAMES) + HEADERS[3:]
+        return (HEADERS[:3] + list(SECTION_NAMES) + HEADERS[3:4] +
+                ["Rash (algebra)", "Rash (geometriya)"] + HEADERS[4:])
 
     def row_for_user(self, user_id) -> Optional[RaschRow]:
         for row in self.rows:
@@ -203,6 +232,13 @@ async def build_rasch_report(db: AsyncSession, test_id: UUID) -> Optional[RaschR
         for row in rows:
             row.algebra = sum(v for v, sec in zip(row.item_values, sections) if sec == "Algebra")
             row.geometry = sum(v for v, sec in zip(row.item_values, sections) if sec == "Geometriya")
+        # Rasch qiyinligidan vazn: o'rtacha qatnashchining xato qilish ehtimoli
+        center = analysis.theta_mean
+        weights = [1.0 / (1.0 + math.exp(-(item.difficulty - center))) for item in analysis.items]
+        for row in rows:
+            parts = split_score_by_section(row.score, row.item_values, sections, weights)
+            row.score_algebra = parts["Algebra"]
+            row.score_geometry = parts["Geometriya"]
 
     rows.sort(key=lambda r: (-r.score, -r.correct, r.name.lower()))
     for rank, row in enumerate(rows, 1):
@@ -264,9 +300,13 @@ def fmt_percent(value: Optional[float]) -> str:
 def table_rows(report: RaschReport) -> List[List[str]]:
     rows = []
     for r in report.rows:
-        sections = [str(r.algebra), str(r.geometry)] if report.has_sections else []
-        rows.append([str(r.rank), r.name, str(r.correct)] + sections +
-                    [fmt_num(r.score), fmt_percent(r.percent), r.grade or "-", fmt_num(r.fan1), fmt_num(r.fan2)])
+        if report.has_sections:
+            rows.append([str(r.rank), r.name, str(r.correct), str(r.algebra), str(r.geometry),
+                         fmt_num(r.score), fmt_num(r.score_algebra), fmt_num(r.score_geometry),
+                         fmt_percent(r.percent), r.grade or "-", fmt_num(r.fan1), fmt_num(r.fan2)])
+        else:
+            rows.append([str(r.rank), r.name, str(r.correct), fmt_num(r.score), fmt_percent(r.percent),
+                         r.grade or "-", fmt_num(r.fan1), fmt_num(r.fan2)])
     return rows
 
 
@@ -437,37 +477,55 @@ def export_rasch_to_pdf(report: RaschReport, filepath: str) -> str:
     elements = [NextPageTemplate("Later"), facts_table, Spacer(1, 12)]
 
     if report.has_sections:
+        # Ikki qatorli sarlavha: "To'g'ri javoblar" va "Rash ball" guruhlari
         totals = report.section_totals()
-        header = ["№", "Ism familiya", f"To'g'ri\n({len(report.item_labels)})",
-                  f"Algebra\n({totals['Algebra']})", f"Geometriya\n({totals['Geometriya']})",
-                  "Rash", "Foiz", "Daraja", "1-Fan", "2-Fan"]
-        col_widths = [22, 128, 38, 48, 58, 46, 50, 40, 43, 43]
+        header_rows = [
+            ["№", "Ism familiya", "To'g'ri javoblar", "", "", "Rash ball", "", "",
+             "Foiz", "Daraja", "1-Fan", "2-Fan"],
+            ["", "", f"Jami\n({len(report.item_labels)})", f"Algebra\n({totals['Algebra']})",
+             f"Geometriya\n({totals['Geometriya']})", "Jami", "Algebra", "Geometriya", "", "", "", ""],
+        ]
+        col_widths = [20, 104, 30, 36, 52, 36, 38, 52, 38, 34, 38, 38]
+        header_spans = [
+            ("SPAN", (0, 0), (0, 1)), ("SPAN", (1, 0), (1, 1)),
+            ("SPAN", (2, 0), (4, 0)), ("SPAN", (5, 0), (7, 0)),
+            ("SPAN", (8, 0), (8, 1)), ("SPAN", (9, 0), (9, 1)),
+            ("SPAN", (10, 0), (10, 1)), ("SPAN", (11, 0), (11, 1)),
+            ("ALIGN", (2, 0), (7, 0), "CENTER"),
+            ("LINEBELOW", (2, 0), (7, 0), 0.6, colors.HexColor("#4A505C")),
+            ("FONTSIZE", (0, 0), (-1, -1), 7.5),
+            # Rash ball guruhini ajratib ko'rsatish
+            ("FONTNAME", (5, 2), (5, -1), bold),
+        ]
     else:
-        header = list(HEADERS)
+        header_rows = [list(HEADERS)]
         col_widths = [28, 165, 46, 52, 54, 48, 60, 60]
-    data = [header] + [
+        header_spans = []
+    head_n = len(header_rows)
+    data = header_rows + [
         [row[0], _pdf_safe(row[1])] + row[2:] for row in table_rows(report)
     ]
-    table = Table(data, colWidths=col_widths, repeatRows=1)
+    table = Table(data, colWidths=col_widths, repeatRows=head_n)
 
+    last_head = head_n - 1
     style = [
-        ("FONTNAME", (0, 0), (-1, 0), bold),
-        ("FONTNAME", (0, 1), (-1, -1), regular),
+        ("FONTNAME", (0, 0), (-1, last_head), bold),
+        ("FONTNAME", (0, head_n), (-1, -1), regular),
         ("FONTSIZE", (0, 0), (-1, -1), 8),
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(BRAND_DARK)),
-        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-        ("LINEBELOW", (0, 0), (-1, 0), 1.5, colors.HexColor(BRAND_ORANGE)),
-        ("INNERGRID", (0, 1), (-1, -1), 0.6, colors.white),
+        ("BACKGROUND", (0, 0), (-1, last_head), colors.HexColor(BRAND_DARK)),
+        ("TEXTCOLOR", (0, 0), (-1, last_head), colors.white),
+        ("LINEBELOW", (0, last_head), (-1, last_head), 1.5, colors.HexColor(BRAND_ORANGE)),
+        ("INNERGRID", (0, head_n), (-1, -1), 0.6, colors.white),
         ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor(GRID_COLOR)),
         ("ALIGN", (0, 0), (-1, -1), "LEFT"),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("TOPPADDING", (0, 0), (-1, -1), 2.5),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
-        ("TOPPADDING", (0, 0), (-1, 0), 5),
-        ("BOTTOMPADDING", (0, 0), (-1, 0), 5),
-        ("LEFTPADDING", (0, 0), (-1, -1), 4),
-    ]
-    for i, row in enumerate(report.rows, 1):
+        ("TOPPADDING", (0, 0), (-1, last_head), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, last_head), 4),
+        ("LEFTPADDING", (0, 0), (-1, -1), 3.5),
+    ] + header_spans
+    for i, row in enumerate(report.rows, head_n):
         style.append(("BACKGROUND", (0, i), (-1, i), colors.HexColor(GRADE_COLORS[row.grade])))
     table.setStyle(TableStyle(style))
     elements.append(table)
@@ -502,7 +560,9 @@ def export_rasch_to_pdf(report: RaschReport, filepath: str) -> str:
         "Ballar Rasch modeli (CML + WLE) asosida hisoblangan: T = 50 + 10·Z (shartli maksimal 75, undan yuqori ham bo'lishi mumkin). "
         "Darajalar: A+ ≥70, A ≥65, B+ ≥60, B ≥55, C+ ≥50, C ≥46. "
         "Foiz: A+/A – 100%, qolganlari ball/65. 1-Fan = foiz·93 + 11, 2-Fan = foiz·63 + 11 "
-        f"(majburiy fan 11 ball). Ishonchlilik (reliability): {rel}.",
+        f"(majburiy fan 11 ball). Ishonchlilik (reliability): {rel}."
+        + (" Rash ball algebra va geometriya qismlariga talaba to'g'ri yechgan savollarning Rasch qiyinligiga "
+           "proporsional bo'lingan (algebra + geometriya = jami)." if report.has_sections else ""),
         note_style,
     ))
     for warning in analysis.warnings:
@@ -538,8 +598,8 @@ def export_rasch_to_excel(report: RaschReport, filepath: str) -> str:
 
     for r in report.rows:
         sections = [r.algebra, r.geometry] if report.has_sections else []
-        ws.append([r.rank, r.name, r.correct] + sections + [
-            r.score,
+        score_parts = [r.score_algebra, r.score_geometry] if report.has_sections else []
+        ws.append([r.rank, r.name, r.correct] + sections + [r.score] + score_parts + [
             (r.percent / 100.0) if r.percent is not None else "-",
             r.grade or "-",
             r.fan1 if r.fan1 is not None else "-",
@@ -552,12 +612,15 @@ def export_rasch_to_excel(report: RaschReport, filepath: str) -> str:
             cell.border = border
             cell.alignment = Alignment(horizontal="left", vertical="center")
         col = {name: i + 1 for i, name in enumerate(headers)}
-        ws.cell(row=row_idx, column=col["Rash"]).number_format = "0.00"
+        for name in ("Rash", "Rash (algebra)", "Rash (geometriya)"):
+            if name in col:
+                ws.cell(row=row_idx, column=col[name]).number_format = "0.00"
         ws.cell(row=row_idx, column=col["Foiz"]).number_format = "0.00%"
         ws.cell(row=row_idx, column=col["1-Fan"]).number_format = "0.00"
         ws.cell(row=row_idx, column=col["2-Fan"]).number_format = "0.00"
 
-    widths = {"№": 6, "Ism familiya": 34, "Algebra": 10, "Geometriya": 12, "Manba": 10}
+    widths = {"№": 6, "Ism familiya": 34, "Algebra": 10, "Geometriya": 12, "Manba": 10,
+              "Rash (algebra)": 14, "Rash (geometriya)": 17}
     for i, name in enumerate(headers + ["Manba"], 1):
         ws.column_dimensions[get_column_letter(i)].width = widths.get(name, 9)
     ws.freeze_panes = "A2"
