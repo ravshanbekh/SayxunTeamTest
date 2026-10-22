@@ -253,3 +253,11 @@ async def test_toggle_price_makes_test_free(client):
     r = await client.patch(f"/api/v1/tests/{test['id']}", json={"price": 0}, headers=client.admin_headers)
     assert r.json()["price"] == 0
     assert (await _start(client, user["id"], test["id"])).status_code == 201
+
+
+async def test_test_detail_returns_price(client):
+    """Tahrirlash oynasi narxni shu javobdan oladi; yo'qolsa, saqlashda test bepulga aylanadi."""
+    test = await _make_test(client, "PAID6", 30000)
+    r = await client.get(f"/api/v1/tests/{test['id']}", headers=client.admin_headers)
+    assert r.status_code == 200
+    assert r.json()["price"] == 30000

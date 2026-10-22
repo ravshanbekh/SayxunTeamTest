@@ -155,6 +155,7 @@ async def get_test_with_key(
         "end_time": test.end_time,
         "extra_minutes": test.extra_minutes,
         "test_type": test.test_type or 'sertifikat',
+        "price": test.price or 0,
         "created_at": test.created_at,
         "answer_key": None
     }

@@ -106,6 +106,103 @@ function toDatetimeLocal(isoStr) {
     return adjusted.toISOString().slice(0, 16);
 }
 
+// ==========================================
+// Sana-vaqt tanlagich (flatpickr) — qiymat formati o'zgarmaydi: YYYY-MM-DDTHH:MM
+// ==========================================
+const DATETIME_PREFIXES = ['test', 'edit-test', 'prez-test', 'edit-prez-test'];
+
+function addPickerActions(_dates, _str, fp) {
+    const bar = document.createElement('div');
+    bar.className = 'fp-actions';
+    bar.innerHTML = `
+        <button type="button" data-act="clear">Tozalash</button>
+        <button type="button" data-act="now">Hozir</button>
+        <button type="button" data-act="ok" class="is-primary">Tayyor</button>`;
+    bar.addEventListener('click', (e) => {
+        const act = e.target.closest('button')?.dataset.act;
+        if (act === 'clear') { fp.clear(); fp.close(); }
+        if (act === 'now') fp.setDate(new Date(), true);
+        if (act === 'ok') fp.close();
+    });
+    fp.calendarContainer.appendChild(bar);
+}
+
+function initDatePickers() {
+    if (!window.flatpickr) return;  // kutubxona yuklanmasa, oddiy maydon qoladi
+    DATETIME_PREFIXES.forEach(prefix => ['start', 'end'].forEach(kind => {
+        flatpickr(`#${prefix}-${kind}-time`, {
+            enableTime: true,
+            time_24hr: true,
+            dateFormat: 'Y-m-d\\TH:i',
+            altInput: true,
+            altFormat: 'd.m.Y, H:i',
+            altInputClass: 'dt-input',
+            locale: 'uz_latn',
+            disableMobile: true,
+            static: true,
+            onReady: addPickerActions,
+            onOpen: (_d, _s, fp) => requestAnimationFrame(() =>
+                fp.calendarContainer.scrollIntoView({ block: 'nearest', behavior: 'smooth' })),
+        }).altInput.placeholder = 'Sana va vaqtni tanlang';
+    }));
+}
+
+function setDateTime(id, value) {
+    const el = document.getElementById(id);
+    if (el._flatpickr) el._flatpickr.setDate(value || null, false);
+    else el.value = value || '';
+}
+
+function clearDateTimes(prefix) {
+    setDateTime(`${prefix}-start-time`, '');
+    setDateTime(`${prefix}-end-time`, '');
+}
+
+initDatePickers();
+
+// ==========================================
+// Javob tanlagich: A B C D tugmalari; qiymat yashirin maydonda (id o'zgarmaydi)
+// ==========================================
+function answerPicker(id, num, options, current = 'A') {
+    const buttons = options.map(opt => `
+        <button type="button" class="ans-opt${opt === current ? ' is-on' : ''}" data-value="${opt}"
+                aria-pressed="${opt === current}">${opt}</button>`).join('');
+    return `<div class="mcq-answer-input">
+        <span class="mcq-num">${num}</span>
+        <div class="ans-opts" role="group" aria-label="${num}-savol javobi">${buttons}</div>
+        <input type="hidden" id="${id}" value="${current}">
+    </div>`;
+}
+
+function chooseAnswer(button) {
+    const group = button.closest('.mcq-answer-input');
+    group.querySelectorAll('.ans-opt').forEach(b => {
+        const on = b === button;
+        b.classList.toggle('is-on', on);
+        b.setAttribute('aria-pressed', on);
+    });
+    group.querySelector('input[type="hidden"]').value = button.dataset.value;
+}
+
+document.addEventListener('click', (e) => {
+    const button = e.target.closest('.ans-opt');
+    if (button) chooseAnswer(button);
+});
+
+// Klaviaturadan tez kiritish: harf bosilsa tanlanadi va keyingi savolga o'tiladi
+document.addEventListener('keydown', (e) => {
+    const current = e.target.closest?.('.ans-opt');
+    if (!current || e.ctrlKey || e.metaKey || e.altKey) return;
+    const group = current.closest('.mcq-answer-input');
+    const match = [...group.querySelectorAll('.ans-opt')]
+        .find(b => b.dataset.value === e.key.toUpperCase());
+    if (!match) return;
+    e.preventDefault();
+    chooseAnswer(match);
+    const next = group.nextElementSibling?.querySelector('.ans-opt.is-on');
+    (next || match).focus();
+});
+
 // Ikonkalar (inline SVG, 24x24, chiziqli)
 const ICON_PATHS = {
     award: '<circle cx="12" cy="9" r="6"/><path d="m8.5 13.8-1.5 7.2 5-2.6 5 2.6-1.5-7.2"/>',
@@ -442,8 +539,8 @@ async function openEditModal(testId, testType) {
             document.getElementById('edit-prez-test-title').value = test.title;
             document.getElementById('edit-prez-test-desc').value = test.description || '';
             document.getElementById('edit-prez-test-active').checked = test.is_active;
-            document.getElementById('edit-prez-test-start-time').value = toDatetimeLocal(test.start_time);
-            document.getElementById('edit-prez-test-end-time').value = toDatetimeLocal(test.end_time);
+            setDateTime('edit-prez-test-start-time', toDatetimeLocal(test.start_time));
+            setDateTime('edit-prez-test-end-time', toDatetimeLocal(test.end_time));
             fillPrice('edit-prez-test', test.price);
 
             // 40 MCQ (A-D)
@@ -451,10 +548,7 @@ async function openEditModal(testId, testType) {
             for (let i = 1; i <= 40; i++) {
                 const options = ['A', 'B', 'C', 'D'];
                 const currentVal = (test.answer_key && test.answer_key.mcq_answers) ? (test.answer_key.mcq_answers[i] || 'A') : 'A';
-                const optionsHTML = options.map(opt =>
-                    `<option value="${opt}" ${opt === currentVal ? 'selected' : ''}>${opt}</option>`
-                ).join('');
-                mcqGrid += `<div class="mcq-answer-input"><label>${i}</label><select id="edit-prez-mcq-${i}">${optionsHTML}</select></div>`;
+                mcqGrid += answerPicker(`edit-prez-mcq-${i}`, i, options, currentVal);
             }
             document.getElementById('edit-prez-mcq-answers-grid').innerHTML = mcqGrid;
             document.getElementById('edit-prezident-modal').classList.remove('hidden');
@@ -464,18 +558,15 @@ async function openEditModal(testId, testType) {
             document.getElementById('edit-test-title').value = test.title;
             document.getElementById('edit-test-desc').value = test.description || '';
             document.getElementById('edit-test-active').checked = test.is_active;
-            document.getElementById('edit-test-start-time').value = toDatetimeLocal(test.start_time);
-            document.getElementById('edit-test-end-time').value = toDatetimeLocal(test.end_time);
+            setDateTime('edit-test-start-time', toDatetimeLocal(test.start_time));
+            setDateTime('edit-test-end-time', toDatetimeLocal(test.end_time));
             fillPrice('edit-test', test.price);
 
             let mcqGrid = '';
             for (let i = 1; i <= 35; i++) {
                 const options = i <= 32 ? ['A', 'B', 'C', 'D'] : ['A', 'B', 'C', 'D', 'E', 'F'];
                 const currentVal = (test.answer_key && test.answer_key.mcq_answers) ? (test.answer_key.mcq_answers[i] || 'A') : 'A';
-                const optionsHTML = options.map(opt =>
-                    `<option value="${opt}" ${opt === currentVal ? 'selected' : ''}>${opt}</option>`
-                ).join('');
-                mcqGrid += `<div class="mcq-answer-input"><label>${i}</label><select id="edit-mcq-${i}">${optionsHTML}</select></div>`;
+                mcqGrid += answerPicker(`edit-mcq-${i}`, i, options, currentVal);
             }
 
             let openEndedHTML = '<div class="open-ended-section"><h3>Yozma savollar (36-45)</h3>';
@@ -602,8 +693,7 @@ document.getElementById('create-test-btn').addEventListener('click', () => {
     let mcqGrid = '';
     for (let i = 1; i <= 35; i++) {
         const options = i <= 32 ? ['A', 'B', 'C', 'D'] : ['A', 'B', 'C', 'D', 'E', 'F'];
-        const optionsHTML = options.map(opt => `<option value="${opt}">${opt}</option>`).join('');
-        mcqGrid += `<div class="mcq-answer-input"><label>${i}</label><select id="mcq-${i}">${optionsHTML}</select></div>`;
+        mcqGrid += answerPicker(`mcq-${i}`, i, options);
     }
 
     let openEndedHTML = '<div class="open-ended-section"><h3>Yozma savollar (36-45)</h3>';
@@ -619,6 +709,7 @@ document.getElementById('create-test-btn').addEventListener('click', () => {
 
     document.getElementById('mcq-answers-grid').innerHTML = mcqGrid + openEndedHTML;
     document.getElementById('create-test-form').reset();
+    clearDateTimes('test');
     fillPrice('test', 0);
     document.getElementById('create-test-modal').classList.remove('hidden');
 });
@@ -671,12 +762,12 @@ document.getElementById('create-prezident-btn').addEventListener('click', () => 
     let mcqGrid = '';
     for (let i = 1; i <= 40; i++) {
         const options = ['A', 'B', 'C', 'D'];
-        const optionsHTML = options.map(opt => `<option value="${opt}">${opt}</option>`).join('');
-        mcqGrid += `<div class="mcq-answer-input"><label>${i}</label><select id="prez-mcq-${i}">${optionsHTML}</select></div>`;
+        mcqGrid += answerPicker(`prez-mcq-${i}`, i, options);
     }
 
     document.getElementById('prez-mcq-answers-grid').innerHTML = mcqGrid;
     document.getElementById('create-prezident-form').reset();
+    clearDateTimes('prez-test');
     fillPrice('prez-test', 0);
     document.getElementById('create-prezident-modal').classList.remove('hidden');
 });

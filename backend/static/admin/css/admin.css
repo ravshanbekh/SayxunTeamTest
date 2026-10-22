@@ -258,10 +258,93 @@ textarea:focus-visible {
     color: var(--ink);
 }
 
-.checkbox-label input {
+/* Belgilash katakchasi: yumaloq burchakli, to'q sariq belgi */
+.checkbox-label input[type="checkbox"],
+.pay-check {
+    appearance: none;
+    -webkit-appearance: none;
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    margin: 0;
+    border: 1.5px solid var(--form);
+    border-radius: 6px;
+    background: var(--sheet) center / 14px no-repeat;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.checkbox-label input[type="checkbox"]:hover,
+.pay-check:hover {
+    border-color: var(--accent);
+}
+
+.checkbox-label input[type="checkbox"]:checked,
+.pay-check:checked {
+    border-color: var(--accent);
+    background-color: var(--accent);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12.5 4.5 4.5L19 7.5'/%3E%3C/svg%3E");
+}
+
+.checkbox-label input[type="checkbox"]:focus-visible,
+.pay-check:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--accent-tint);
+    border-color: var(--accent);
+}
+
+/* Almashtirgich (switch): Pullik test, Faol */
+.checkbox-label.switch {
+    gap: 12px;
+}
+
+.checkbox-label.switch input[type="checkbox"] {
+    position: relative;
+    width: 42px;
+    height: 24px;
+    border: none;
+    border-radius: 999px;
+    background: var(--form);
+    transition: background-color 0.2s ease;
+}
+
+.checkbox-label.switch input[type="checkbox"]::before {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
     width: 18px;
     height: 18px;
-    accent-color: var(--accent);
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(32, 36, 44, 0.25);
+    transition: transform 0.2s ease;
+}
+
+.checkbox-label.switch input[type="checkbox"]:checked {
+    background: var(--accent);
+    background-image: none;
+}
+
+.checkbox-label.switch input[type="checkbox"]:checked::before {
+    transform: translateX(18px);
+}
+
+.switch-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    line-height: 1.3;
+}
+
+.switch-text b {
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.switch-text small {
+    font-size: 12.5px;
+    color: var(--ink-soft);
 }
 
 /* --------------------------------------------------------------------------
@@ -781,46 +864,75 @@ textarea:focus-visible {
 #prez-mcq-answers-grid,
 #edit-prez-mcq-answers-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
     gap: 8px;
 }
 
 .mcq-answer-input {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 4px 4px 4px 10px;
+    gap: 8px;
+    padding: 5px 5px 5px 4px;
     border: 1.5px solid var(--form-line);
-    border-radius: var(--radius-control);
+    border-radius: 12px;
     background: var(--sheet);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .mcq-answer-input:focus-within {
     border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-tint);
 }
 
-.mcq-answer-input label {
-    flex: 1;
+.mcq-num {
+    min-width: 28px;
     font-family: var(--font-display);
     font-weight: 500;
     font-size: 13px;
     color: var(--ink-soft);
+    text-align: center;
     font-variant-numeric: tabular-nums;
 }
 
-.mcq-answer-input select {
-    width: 54px;
-    flex-shrink: 0;
-    height: 32px;
+.ans-opts {
+    flex: 1;
+    display: flex;
+    gap: 3px;
+    padding: 3px;
+    border-radius: 9px;
+    background: var(--form-tint);
+}
+
+.ans-opt {
+    flex: 1;
+    min-width: 0;
+    height: 28px;
+    padding: 0;
     border: none;
-    border-radius: 8px;
-    background: var(--accent-tint);
-    color: var(--ink);
+    border-radius: 7px;
+    background: transparent;
+    color: var(--ink-soft);
     font-family: var(--font-text);
     font-weight: 700;
-    font-size: 15px;
-    text-align: center;
+    font-size: 13px;
     cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ans-opt:hover {
+    background: var(--sheet);
+    color: var(--ink);
+}
+
+.ans-opt.is-on {
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 1px 3px rgba(245, 130, 19, 0.35);
+}
+
+.ans-opt:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 1px;
 }
 
 .open-ended-section {
@@ -1042,6 +1154,10 @@ math-field.admin-math-input:focus-within {
         gap: 0;
     }
 
+    .form-row.price-row {
+        align-items: stretch;
+    }
+
     .modal {
         padding: 0;
     }
@@ -1215,12 +1331,6 @@ math-field.admin-math-input:focus-within {
     border-bottom: none;
 }
 
-.pay-check {
-    width: 18px;
-    height: 18px;
-    accent-color: var(--accent);
-}
-
 .pay-thumb {
     width: 64px;
     height: 64px;
@@ -1351,5 +1461,242 @@ math-field.admin-math-input:focus-within {
 
     .menu a {
         position: relative;
+    }
+}
+
+/* --------------------------------------------------------------------------
+   Sana-vaqt tanlagich (flatpickr) — brend ranglarida
+   -------------------------------------------------------------------------- */
+.form-group .flatpickr-wrapper {
+    display: block;
+    width: 100%;
+}
+
+.form-group input.dt-input {
+    padding-left: 40px;
+    background: var(--sheet) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23667085' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3.5' y='5' width='17' height='15.5' rx='2.5'/%3E%3Cpath d='M3.5 10h17M8 3v4M16 3v4'/%3E%3C/svg%3E") 12px center / 18px no-repeat;
+    cursor: pointer;
+}
+
+.form-group input.dt-input:focus,
+.form-group input.dt-input.active {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-tint);
+}
+
+.flatpickr-calendar {
+    width: 312px;
+    padding: 6px;
+    border: 1px solid var(--form-line);
+    border-radius: 14px;
+    box-shadow: 0 16px 40px rgba(32, 36, 44, 0.16);
+    font-family: var(--font-text);
+}
+
+.flatpickr-calendar.static {
+    top: calc(100% + 6px);
+    z-index: 20;
+}
+
+/* Umumiy maydon uslubi kalendar ichidagi yil/soat maydonlariga o'tmasin */
+.form-group .flatpickr-calendar input.cur-year,
+.form-group .flatpickr-calendar .flatpickr-time input {
+    min-height: 0;
+    padding: 0;
+    border: none;
+    box-shadow: none;
+    background: transparent;
+}
+
+.form-group .flatpickr-calendar input.cur-year {
+    padding: 0 0 0 4px;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.flatpickr-calendar.open {
+    scroll-margin-bottom: 96px;
+}
+
+.flatpickr-calendar.static.open {
+    z-index: 30;
+}
+
+.flatpickr-calendar::before,
+.flatpickr-calendar::after {
+    display: none;
+}
+
+.flatpickr-innerContainer,
+.flatpickr-rContainer,
+.flatpickr-days,
+.dayContainer {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+}
+
+.flatpickr-months {
+    padding: 4px 0 6px;
+}
+
+.flatpickr-months .flatpickr-month {
+    height: 38px;
+    color: var(--ink);
+}
+
+.flatpickr-current-month {
+    padding-top: 8px;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.flatpickr-current-month .flatpickr-monthDropdown-months {
+    font-weight: 600;
+    border-radius: 6px;
+}
+
+.flatpickr-current-month .flatpickr-monthDropdown-months:hover,
+.flatpickr-current-month input.cur-year:hover,
+.numInputWrapper:hover {
+    background: var(--form-tint);
+}
+
+.flatpickr-months .flatpickr-prev-month,
+.flatpickr-months .flatpickr-next-month {
+    top: 6px;
+    height: 34px;
+    padding: 9px 11px;
+    border-radius: 8px;
+}
+
+.flatpickr-months .flatpickr-prev-month { left: 6px; }
+.flatpickr-months .flatpickr-next-month { right: 6px; }
+
+.flatpickr-months .flatpickr-prev-month:hover,
+.flatpickr-months .flatpickr-next-month:hover {
+    background: var(--accent-tint);
+}
+
+.flatpickr-months .flatpickr-prev-month:hover svg,
+.flatpickr-months .flatpickr-next-month:hover svg {
+    fill: var(--accent);
+}
+
+span.flatpickr-weekday {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.flatpickr-day {
+    max-width: none;
+    height: 38px;
+    line-height: 38px;
+    border-radius: 10px;
+    color: var(--ink);
+    font-weight: 500;
+}
+
+.flatpickr-day:hover,
+.flatpickr-day:focus {
+    border-color: transparent;
+    background: var(--form-tint);
+}
+
+.flatpickr-day.today {
+    border-color: var(--accent);
+}
+
+.flatpickr-day.today:hover {
+    border-color: var(--accent);
+    background: var(--accent-tint);
+    color: var(--ink);
+}
+
+.flatpickr-day.selected,
+.flatpickr-day.selected:hover,
+.flatpickr-day.selected:focus {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: #fff;
+}
+
+.flatpickr-day.prevMonthDay,
+.flatpickr-day.nextMonthDay {
+    color: var(--form);
+}
+
+.flatpickr-time {
+    margin-top: 6px;
+    border-top: 1px solid var(--form-line) !important;
+    border-radius: 0;
+}
+
+.flatpickr-time input,
+.flatpickr-time .flatpickr-time-separator {
+    color: var(--ink);
+    font-family: var(--font-display);
+    font-size: 17px;
+    font-weight: 500;
+}
+
+.flatpickr-time input:hover,
+.flatpickr-time input:focus {
+    background: var(--accent-tint);
+    border-radius: 8px;
+}
+
+.flatpickr-time .numInputWrapper span.arrowUp::after { border-bottom-color: var(--ink-soft); }
+.flatpickr-time .numInputWrapper span.arrowDown::after { border-top-color: var(--ink-soft); }
+
+.fp-actions {
+    display: flex;
+    gap: 6px;
+    padding: 8px 2px 2px;
+    border-top: 1px solid var(--form-line);
+}
+
+.fp-actions button {
+    flex: 1;
+    height: 34px;
+    border: 1px solid var(--form-line);
+    border-radius: 9px;
+    background: var(--sheet);
+    color: var(--ink);
+    font-family: var(--font-text);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.fp-actions button:hover {
+    background: var(--form-tint);
+}
+
+.fp-actions button.is-primary {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: #fff;
+}
+
+.fp-actions button.is-primary:hover {
+    background: var(--accent-hover);
+}
+
+/* Raqam maydonidagi strelkalarni yashirish (narx) */
+.form-group input[type="number"]::-webkit-outer-spin-button,
+.form-group input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.form-group input[type="number"] {
+    -moz-appearance: textfield;
+}
+
+@media (max-width: 480px) {
+    .flatpickr-calendar.static {
+        width: 100%;
     }
 }
