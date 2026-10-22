@@ -69,24 +69,33 @@ body {
     display: block;
 }
 
+/* Rasmlar hech qachon cho'zilmasin: flex ichida ham asl nisbat saqlanadi (iOS Safari) */
+.brand-logo,
+.brand-emblem,
+.illus {
+    flex: none;
+    align-self: center;
+    object-fit: contain;
+    max-width: 100%;
+}
+
 .brand-logo {
     display: block;
-    width: 100%;
-    max-width: 196px;
+    width: 196px;
     height: auto;
+    aspect-ratio: 720 / 313;
 }
 
 .brand-emblem {
     display: none;
     width: 52px;
     height: auto;
+    aspect-ratio: 360 / 104;
 }
 
 .illus {
     width: 64px;
     height: 64px;
-    flex-shrink: 0;
-    object-fit: contain;
 }
 
 /* --------------------------------------------------------------------------
@@ -276,7 +285,7 @@ textarea:focus-visible {
 }
 
 .login-hero .brand-logo {
-    max-width: 380px;
+    width: 380px;
 }
 
 .login-hero p {
@@ -881,15 +890,28 @@ math-field.admin-math-input:focus-within {
 @media (max-width: 900px) {
     .login-container {
         grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+        align-content: start;
     }
 
     .login-hero {
-        padding: 32px 24px;
+        align-items: center;
+        text-align: center;
+        padding: 32px 24px 28px;
         gap: 18px;
     }
 
     .login-hero .brand-logo {
-        max-width: 240px;
+        width: min(260px, 80vw);
+    }
+
+    .login-hero p {
+        margin: 0 auto;
+    }
+
+    .login-side {
+        align-items: start;
+        padding: 28px 20px 40px;
     }
 
     .login-hero-icons .illus {

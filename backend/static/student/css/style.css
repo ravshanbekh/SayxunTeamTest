@@ -93,9 +93,12 @@ body {
 }
 
 .brand-emblem {
+    flex: none;
     width: 46px;
     height: auto;
-    flex-shrink: 0;
+    aspect-ratio: 360 / 104;
+    object-fit: contain;
+    align-self: center;
 }
 
 .exam-timer {
