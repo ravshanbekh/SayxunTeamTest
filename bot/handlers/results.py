@@ -100,6 +100,11 @@ async def process_result_code(message: Message, state: FSMContext):
                 return "-" if v is None else f"{v:g}"
             text += "\n<b>🏅 Milliy sertifikat (Rasch) natijasi:</b>\n"
             text += f"   🎯 Rasch ball: <b>{fmt(rasch['score'])}</b>\n"
+            totals = rasch.get('section_totals') or {}
+            if rasch.get('algebra') is not None and totals:
+                text += (f"   📐 Algebra: {rasch['algebra']}/{totals.get('Algebra')}  |  "
+                         f"Geometriya: {rasch['geometry']}/{totals.get('Geometriya')}  |  "
+                         f"Jami: {rasch['correct']}/{rasch['total_items']}\n")
             text += f"   🏆 Daraja: <b>{rasch['grade'] or 'sertifikat berilmaydi (46 dan past)'}</b>\n"
             if rasch.get('percent') is not None:
                 text += f"   📊 Foiz: {fmt(rasch['percent'])}%\n"

@@ -14,6 +14,7 @@ import unicodedata
 
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -55,6 +56,16 @@ GRADE_COLORS = {
 
 HEADERS = ["№", "Ism familiya", "To'g'ri", "Rash", "Foiz", "Daraja", "1-Fan", "2-Fan"]
 
+# Matematika sertifikat testi bo'limlari: geometriya savollari, qolganlari algebra
+GEOMETRY_QUESTIONS = set(range(23, 31)) | {33, 34, 35} | set(range(41, 45))
+SECTION_NAMES = ("Algebra", "Geometriya")
+
+
+def section_for_label(label: str) -> str:
+    """'27' yoki '42b' -> 'Geometriya', '5' yoki '36a' -> 'Algebra'."""
+    digits = "".join(ch for ch in str(label) if ch.isdigit())
+    return "Geometriya" if digits and int(digits) in GEOMETRY_QUESTIONS else "Algebra"
+
 
 @dataclass
 class RaschRow:
@@ -72,6 +83,8 @@ class RaschRow:
     fan1: Optional[float]
     fan2: Optional[float]
     source: str = "online"  # "online" yoki "offline"
+    algebra: Optional[int] = None     # algebra bo'limidagi to'g'ri javoblar
+    geometry: Optional[int] = None    # geometriya bo'limidagi to'g'ri javoblar
 
 
 @dataclass
@@ -81,6 +94,21 @@ class RaschReport:
     item_labels: List[str]
     rows: List[RaschRow]
     analysis: RaschResult
+
+    @property
+    def has_sections(self) -> bool:
+        return self.test_type == "sertifikat"
+
+    def section_totals(self) -> Dict[str, int]:
+        totals = {name: 0 for name in SECTION_NAMES}
+        for label in self.item_labels:
+            totals[section_for_label(label)] += 1
+        return totals
+
+    def headers(self) -> List[str]:
+        if not self.has_sections:
+            return list(HEADERS)
+        return HEADERS[:3] + list(SECTION_NAMES) + HEADERS[3:]
 
     def row_for_user(self, user_id) -> Optional[RaschRow]:
         for row in self.rows:
@@ -170,6 +198,12 @@ async def build_rasch_report(db: AsyncSession, test_id: UUID) -> Optional[RaschR
             fan2=analysis.fan2[idx],
         ))
 
+    if test_type == "sertifikat":
+        sections = [section_for_label(label) for label in labels]
+        for row in rows:
+            row.algebra = sum(v for v, sec in zip(row.item_values, sections) if sec == "Algebra")
+            row.geometry = sum(v for v, sec in zip(row.item_values, sections) if sec == "Geometriya")
+
     rows.sort(key=lambda r: (-r.score, -r.correct, r.name.lower()))
     for rank, row in enumerate(rows, 1):
         row.rank = rank
@@ -228,11 +262,12 @@ def fmt_percent(value: Optional[float]) -> str:
 
 
 def table_rows(report: RaschReport) -> List[List[str]]:
-    return [
-        [str(r.rank), r.name, str(r.correct), fmt_num(r.score), fmt_percent(r.percent),
-         r.grade or "-", fmt_num(r.fan1), fmt_num(r.fan2)]
-        for r in report.rows
-    ]
+    rows = []
+    for r in report.rows:
+        sections = [str(r.algebra), str(r.geometry)] if report.has_sections else []
+        rows.append([str(r.rank), r.name, str(r.correct)] + sections +
+                    [fmt_num(r.score), fmt_percent(r.percent), r.grade or "-", fmt_num(r.fan1), fmt_num(r.fan2)])
+    return rows
 
 
 # ---------------------------------------------------------------------------
@@ -378,11 +413,13 @@ def export_rasch_to_pdf(report: RaschReport, filepath: str) -> str:
     facts = [
         ("Test kodi", _pdf_safe(str(report.test.test_code))),
         ("Ishtirokchilar", f"{len(report.rows)}  (onlayn {sources['online']}, offline {sources['offline']})"),
-        ("Topshiriqlar", str(len(report.item_labels))),
+        ("Topshiriqlar", str(len(report.item_labels)) + (
+            f"  (algebra {report.section_totals()['Algebra']}, geometriya {report.section_totals()['Geometriya']})"
+            if report.has_sections else "")),
         ("Sana", generated),
     ]
     facts_table = Table([[f[0] for f in facts], [f[1] for f in facts]],
-                        colWidths=[70, 190, 70, frame_w - 330])
+                        colWidths=[62, 168, 176, frame_w - 406])
     facts_table.setStyle(TableStyle([
         ("FONTNAME", (0, 0), (-1, 0), regular),
         ("FONTNAME", (0, 1), (-1, 1), bold),
@@ -399,10 +436,18 @@ def export_rasch_to_pdf(report: RaschReport, filepath: str) -> str:
 
     elements = [NextPageTemplate("Later"), facts_table, Spacer(1, 12)]
 
-    data = [HEADERS] + [
+    if report.has_sections:
+        totals = report.section_totals()
+        header = ["№", "Ism familiya", f"To'g'ri\n({len(report.item_labels)})",
+                  f"Algebra\n({totals['Algebra']})", f"Geometriya\n({totals['Geometriya']})",
+                  "Rash", "Foiz", "Daraja", "1-Fan", "2-Fan"]
+        col_widths = [22, 128, 38, 48, 58, 46, 50, 40, 43, 43]
+    else:
+        header = list(HEADERS)
+        col_widths = [28, 165, 46, 52, 54, 48, 60, 60]
+    data = [header] + [
         [row[0], _pdf_safe(row[1])] + row[2:] for row in table_rows(report)
     ]
-    col_widths = [28, 165, 46, 52, 54, 48, 60, 60]
     table = Table(data, colWidths=col_widths, repeatRows=1)
 
     style = [
@@ -483,7 +528,8 @@ def export_rasch_to_excel(report: RaschReport, filepath: str) -> str:
     fills = {g: PatternFill(start_color=c.lstrip("#"), end_color=c.lstrip("#"), fill_type="solid")
              for g, c in GRADE_COLORS.items()}
 
-    ws.append(HEADERS + ["Manba"])
+    headers = report.headers()
+    ws.append(headers + ["Manba"])
     for cell in ws[1]:
         cell.fill = header_fill
         cell.font = Font(bold=True, color="FFFFFF")
@@ -491,8 +537,9 @@ def export_rasch_to_excel(report: RaschReport, filepath: str) -> str:
         cell.alignment = Alignment(horizontal="left", vertical="center")
 
     for r in report.rows:
-        ws.append([
-            r.rank, r.name, r.correct, r.score,
+        sections = [r.algebra, r.geometry] if report.has_sections else []
+        ws.append([r.rank, r.name, r.correct] + sections + [
+            r.score,
             (r.percent / 100.0) if r.percent is not None else "-",
             r.grade or "-",
             r.fan1 if r.fan1 is not None else "-",
@@ -504,18 +551,21 @@ def export_rasch_to_excel(report: RaschReport, filepath: str) -> str:
             cell.fill = fills[r.grade]
             cell.border = border
             cell.alignment = Alignment(horizontal="left", vertical="center")
-        ws.cell(row=row_idx, column=4).number_format = "0.00"
-        ws.cell(row=row_idx, column=5).number_format = "0.00%"
-        ws.cell(row=row_idx, column=7).number_format = "0.00"
-        ws.cell(row=row_idx, column=8).number_format = "0.00"
+        col = {name: i + 1 for i, name in enumerate(headers)}
+        ws.cell(row=row_idx, column=col["Rash"]).number_format = "0.00"
+        ws.cell(row=row_idx, column=col["Foiz"]).number_format = "0.00%"
+        ws.cell(row=row_idx, column=col["1-Fan"]).number_format = "0.00"
+        ws.cell(row=row_idx, column=col["2-Fan"]).number_format = "0.00"
 
-    for col, width in zip("ABCDEFGHI", [6, 34, 9, 9, 10, 9, 10, 10, 10]):
-        ws.column_dimensions[col].width = width
+    widths = {"№": 6, "Ism familiya": 34, "Algebra": 10, "Geometriya": 12, "Manba": 10}
+    for i, name in enumerate(headers + ["Manba"], 1):
+        ws.column_dimensions[get_column_letter(i)].width = widths.get(name, 9)
     ws.freeze_panes = "A2"
 
     # Savollar tahlili
     ws2 = wb.create_sheet("Savollar tahlili")
-    ws2.append(["Savol", "To'g'ri javoblar", "Foiz", "Qiyinlik (logit)", "Izoh"])
+    ws2.append(["Savol", "To'g'ri javoblar", "Foiz", "Qiyinlik (logit)", "Izoh"] +
+               (["Bo'lim"] if report.has_sections else []))
     for cell in ws2[1]:
         cell.fill = header_fill
         cell.font = Font(bold=True, color="FFFFFF")
@@ -525,9 +575,9 @@ def export_rasch_to_excel(report: RaschReport, filepath: str) -> str:
         ws2.append([
             label, item.correct_count, item.correct_count / n, round(item.difficulty, 3),
             "Chegaraviy (0.3 tuzatma)" if item.extreme else "",
-        ])
+        ] + ([section_for_label(label)] if report.has_sections else []))
         ws2.cell(row=ws2.max_row, column=3).number_format = "0.0%"
-    for col, width in zip("ABCDE", [8, 16, 10, 16, 26]):
+    for col, width in zip("ABCDEF", [8, 16, 10, 16, 26, 12]):
         ws2.column_dimensions[col].width = width
 
     # Talabalar bo'yicha 0/1 matritsa (tekshirish uchun)

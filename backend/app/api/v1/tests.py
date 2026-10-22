@@ -2,6 +2,8 @@
 Test endpoints - test management and retrieval.
 """
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 from typing import List
@@ -28,6 +30,28 @@ from app.config import settings
 router = APIRouter()
 
 
+async def _ensure_code_free(db: AsyncSession, test_code: str, exclude_id: UUID | None = None):
+    """Test kodi band bo'lsa 400 qaytarish (aks holda baza 500 xato beradi)."""
+    from app.models.test import Test
+
+    code = (test_code or "").strip().upper()
+    stmt = select(Test.id).where(Test.test_code == code)
+    if exclude_id is not None:
+        stmt = stmt.where(Test.id != exclude_id)
+    if (await db.execute(stmt)).first():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"'{code}' kodli test allaqachon mavjud. Boshqa test kodini kiriting."
+        )
+
+
+def _duplicate_code_error(test_code: str) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=f"'{(test_code or '').strip().upper()}' kodli test allaqachon mavjud. Boshqa test kodini kiriting."
+    )
+
+
 @router.post("/", response_model=TestResponse, status_code=status.HTTP_201_CREATED)
 async def create_new_test(
     test_data: TestCreate,
@@ -37,7 +61,12 @@ async def create_new_test(
     """
     Create a new test with answer key (admin only).
     """
-    test = await create_test(db, test_data, current_admin.id)
+    await _ensure_code_free(db, test_data.test_code)
+    try:
+        test = await create_test(db, test_data, current_admin.id)
+    except IntegrityError:
+        await db.rollback()
+        raise _duplicate_code_error(test_data.test_code)
     return test
 
 
@@ -164,7 +193,13 @@ async def update_test_endpoint(
     """
     Update test information (admin only).
     """
-    test = await update_test_with_answers(db, test_id, test_data)
+    if test_data.test_code is not None:
+        await _ensure_code_free(db, test_data.test_code, exclude_id=test_id)
+    try:
+        test = await update_test_with_answers(db, test_id, test_data)
+    except IntegrityError:
+        await db.rollback()
+        raise _duplicate_code_error(test_data.test_code)
     
     if not test:
         raise HTTPException(
