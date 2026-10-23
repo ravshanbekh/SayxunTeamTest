@@ -49,6 +49,7 @@ document.querySelectorAll('.menu a[data-page]').forEach(link => {
         if (page === 'prezident') loadPrezidentTests();
         if (page === 'admins') loadAdmins();
         if (page === 'payments') loadPayments();
+        if (page === 'students') loadStudentsPage();
     });
 });
 
@@ -59,7 +60,7 @@ async function loadDashboard() {
     refreshPaymentsBadge();
     try {
         const [students, sertifikat, prezident] = await Promise.all([
-            apiRequest('/api/v1/admin/students?limit=5000').then(r => r.json()),
+            apiRequest('/api/v1/admin/students/list?page_size=1').then(r => r.json()),
             apiRequest('/api/v1/tests/?test_type=sertifikat').then(r => r.json()),
             apiRequest('/api/v1/tests/?test_type=prezident').then(r => r.json()),
         ]);
@@ -71,7 +72,7 @@ async function loadDashboard() {
                 <div><h3>${label}</h3><p class="stat-number">${value}</p></div>
             </div>`;
         document.getElementById('stats').innerHTML =
-            stat('icon-students', "Ro'yxatdan o'tgan talabalar", students.length) +
+            stat('icon-students', "Ro'yxatdan o'tgan talabalar", students.total) +
             stat('icon-certificate', 'Sertifikat testlari', sertifikat.length) +
             stat('icon-school', 'Prezident maktabi testlari', prezident.length) +
             stat('icon-exam', 'Hozir faol testlar', active);
@@ -217,6 +218,7 @@ const ICON_PATHS = {
     trash: '<path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 13h10l1-13"/><path d="M9 7V4h6v3"/>',
     calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
+    users: '<circle cx="9" cy="8" r="4"/><path d="M2 21v-1a6 6 0 0 1 6-6h2a6 6 0 0 1 6 6v1"/><path d="M16 4.13a4 4 0 0 1 0 7.75"/><path d="M22 21v-1a5 5 0 0 0-3.5-4.77"/>',
 };
 
 function icon(name) {
@@ -267,6 +269,7 @@ function buildTestCard(test) {
         <div class="action-group">
             <span class="action-group-label">Boshqarish</span>
             <div class="test-card-actions">
+                <button class="btn" onclick="openStudentsForTest('${id}')">${icon('users')} O'quvchilar</button>
                 <button class="btn" onclick="openEditModal('${id}', '${type}')">${icon('edit')} Tahrirlash</button>
                 <button class="btn" onclick="extendAllSessions('${id}', ${title})">${icon('clock')} Hammaga +5 daqiqa</button>
                 <button class="btn" onclick="clearSessions('${id}', ${title})">${icon('reset')} Sessiyalarni tozalash</button>
@@ -1151,3 +1154,221 @@ if (isLoggedIn()) {
     refreshPaymentsBadge();
 }
 setInterval(() => { if (isLoggedIn()) refreshPaymentsBadge(); }, 60000);
+
+// ==========================================
+// O'QUVCHILAR: hammasi yoki test bo'yicha, filtr va sahifalash
+// ==========================================
+const STUDENT_SORTS = {
+    all: [['newest', 'Avval yangilari'], ['oldest', 'Avval eskilari'], ['name', "Familiya bo'yicha"], ['tests', "Ko'p test ishlaganlar"]],
+    test: [['newest', 'Oxirgi kirganlar'], ['oldest', 'Birinchi kirganlar'], ['name', "Familiya bo'yicha"], ['score', "Natija bo'yicha"]],
+};
+const STUDENT_STATUS = {
+    submitted: ['is-on', 'Topshirgan'],
+    in_progress: ['is-wait', 'Jarayonda'],
+    expired: ['is-off', 'Vaqti tugagan'],
+};
+const studentState = { testId: '', q: '', region: '', status: '', sort: 'newest', page: 1, pageSize: 20 };
+let studentRequestId = 0;
+let studentSearchTimer = null;
+
+async function loadStudentsPage() {
+    await loadStudentTests();
+    fillStudentSorts();
+    loadStudents();
+}
+
+function openStudentsForTest(testId) {
+    Object.assign(studentState, { testId, q: '', region: '', status: '', sort: 'newest', page: 1 });
+    document.getElementById('stu-q').value = '';
+    document.querySelector('.menu a[data-page="students"]').click();
+}
+
+async function loadStudentTests() {
+    const select = document.getElementById('stu-test');
+    try {
+        const [sert, prez] = await Promise.all([
+            apiRequest('/api/v1/tests/?test_type=sertifikat').then(r => r.json()),
+            apiRequest('/api/v1/tests/?test_type=prezident').then(r => r.json()),
+        ]);
+        const option = t => `<option value="${t.id}">${escapeHtml(t.test_code)} — ${escapeHtml(t.title)}</option>`;
+        const group = (label, list) => list.length ? `<optgroup label="${label}">${list.map(option).join('')}</optgroup>` : '';
+        select.innerHTML = `<option value="">Barcha o'quvchilar</option>`
+            + group('Sertifikat testlari', sert) + group('Prezident maktabi', prez);
+    } catch (error) {
+        console.error('Testlar yuklanmadi:', error);
+    }
+    select.value = studentState.testId;
+    if (select.value !== studentState.testId) studentState.testId = '';  // test o'chirilgan bo'lsa
+}
+
+function fillStudentSorts() {
+    const options = STUDENT_SORTS[studentState.testId ? 'test' : 'all'];
+    if (!options.some(([value]) => value === studentState.sort)) studentState.sort = 'newest';
+    const select = document.getElementById('stu-sort');
+    select.innerHTML = options.map(([value, label]) => `<option value="${value}">${label}</option>`).join('');
+    select.value = studentState.sort;
+    document.getElementById('stu-region').value = studentState.region;
+    document.getElementById('stu-size').value = String(studentState.pageSize);
+    document.getElementById('stu-tabs').classList.toggle('hidden', !studentState.testId);
+}
+
+async function loadStudents() {
+    const requestId = ++studentRequestId;
+    const list = document.getElementById('stu-list');
+    const params = new URLSearchParams({ page: studentState.page, page_size: studentState.pageSize, sort: studentState.sort });
+    if (studentState.testId) params.set('test_id', studentState.testId);
+    if (studentState.q) params.set('q', studentState.q);
+    if (studentState.region) params.set('region', studentState.region);
+    if (studentState.testId && studentState.status) params.set('status', studentState.status);
+
+    list.classList.add('is-loading');
+    try {
+        const data = await apiRequest(`/api/v1/admin/students/list?${params}`).then(r => r.json());
+        if (requestId !== studentRequestId) return;  // keyinroq yuborilgan so'rov javobi muhimroq
+        studentState.page = data.page;
+        renderStudentRegions(data.regions);
+        renderStudentTabs(data.summary);
+        renderStudentRows(data);
+        renderStudentPager(data);
+    } catch (error) {
+        if (requestId !== studentRequestId) return;
+        list.innerHTML = `<div class="empty-state"><h3>Ro'yxat yuklanmadi</h3><p>${escapeHtml(error.message)}</p></div>`;
+        document.getElementById('stu-pager').classList.add('hidden');
+    } finally {
+        if (requestId === studentRequestId) list.classList.remove('is-loading');
+    }
+}
+
+function renderStudentRegions(regions) {
+    const select = document.getElementById('stu-region');
+    const values = studentState.region && !regions.includes(studentState.region)
+        ? [...regions, studentState.region] : regions;
+    select.innerHTML = '<option value="">Barchasi</option>'
+        + values.map(r => `<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join('');
+    select.value = studentState.region;
+}
+
+function renderStudentTabs(summary) {
+    if (!studentState.testId) return;
+    document.querySelectorAll('#stu-tabs [data-count]').forEach(b => { b.textContent = summary[b.dataset.count] ?? 0; });
+    document.querySelectorAll('#stu-tabs .tab').forEach(tab => {
+        const on = tab.dataset.status === studentState.status;
+        tab.classList.toggle('is-active', on);
+        tab.setAttribute('aria-selected', on);
+    });
+}
+
+function renderStudentRows(data) {
+    const list = document.getElementById('stu-list');
+    const byTest = Boolean(studentState.testId);
+    if (!data.items.length) {
+        const filtered = studentState.q || studentState.region || studentState.status;
+        const [title, text] = filtered
+            ? ["Hech kim topilmadi", "Qidiruv yoki filtrni o'zgartirib ko'ring."]
+            : byTest
+                ? ["Bu testga hali hech kim kirmagan", "O'quvchilar botga test kodini yuborib kirganda shu yerda ko'rinadi."]
+                : ["Hali hech kim ro'yxatdan o'tmagan", "O'quvchilar botda ro'yxatdan o'tganda shu yerda ko'rinadi."];
+        list.innerHTML = `<div class="empty-state"><img class="illus" src="../brand/icon-students.webp" alt=""><h3>${title}</h3><p>${text}</p></div>`;
+        return;
+    }
+
+    const start = (data.page - 1) * data.page_size;
+    const numeric = byTest ? [5] : [4, 5];
+    const head = byTest
+        ? ['№', "O'quvchi", 'Viloyat', 'Kirgan vaqti', 'Holat', "To'g'ri javoblar"]
+        : ['№', "O'quvchi", 'Viloyat', "Ro'yxatdan o'tgan", 'Testlar', 'Balans'];
+    const rows = data.items.map((s, i) => {
+        const person = `<td data-label="${head[1]}"><b>${escapeHtml(s.full_name)} ${escapeHtml(s.surname)}</b><small>Telegram ID: ${s.telegram_id}</small></td>`;
+        const cells = byTest ? `
+            <td data-label="${head[3]}">${formatDateTime(s.started_at)}</td>
+            <td data-label="${head[4]}"><span class="status ${STUDENT_STATUS[s.status][0]}">${STUDENT_STATUS[s.status][1]}</span></td>
+            <td data-label="${head[5]}" class="num">${s.score === null ? '<span class="muted">—</span>'
+                : `<b>${s.score}</b><small>test ${s.mcq_score} · yozma ${s.written_score}</small>`}</td>`
+            : `
+            <td data-label="${head[3]}">${formatDateTime(s.registered_at)}</td>
+            <td data-label="${head[4]}" class="num">${s.tests_taken}</td>
+            <td data-label="${head[5]}" class="num ${s.balance ? '' : 'muted'}">${formatSum(s.balance)}</td>`;
+        return `<tr>
+            <td class="idx">${start + i + 1}</td>
+            ${person}
+            <td data-label="${head[2]}">${escapeHtml(s.region)}</td>
+            ${cells}
+        </tr>`;
+    }).join('');
+    list.innerHTML = `<table class="stu-table">
+        <thead><tr>${head.map((h, i) => `<th${numeric.includes(i) ? ' class="num"' : ''}>${h}</th>`).join('')}</tr></thead>
+        <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function pageNumbers(current, total) {
+    const wanted = [...new Set([1, total, current - 1, current, current + 1])]
+        .filter(n => n >= 1 && n <= total).sort((a, b) => a - b);
+    const out = [];
+    wanted.forEach((n, i) => {
+        if (i && n - wanted[i - 1] === 2) out.push(n - 1);
+        else if (i && n - wanted[i - 1] > 2) out.push('…');
+        out.push(n);
+    });
+    return out;
+}
+
+function renderStudentPager(data) {
+    const pager = document.getElementById('stu-pager');
+    pager.classList.toggle('hidden', data.total === 0);
+    const from = (data.page - 1) * data.page_size + 1;
+    const to = Math.min(data.total, data.page * data.page_size);
+    document.getElementById('stu-range').textContent = `${from}–${to} / jami ${data.total} ta`;
+
+    const btn = (page, label, extra = '', cls = '') =>
+        `<button type="button" class="pager-btn${cls}" data-page="${page}" ${extra}>${label}</button>`;
+    document.getElementById('stu-pages').innerHTML =
+        btn(data.page - 1, '‹', `aria-label="Oldingi sahifa" ${data.page <= 1 ? 'disabled' : ''}`)
+        + pageNumbers(data.page, data.pages).map(n => n === '…'
+            ? '<span class="pager-gap">…</span>'
+            : n === data.page ? btn(n, n, 'aria-current="page"', ' is-current') : btn(n, n)).join('')
+        + btn(data.page + 1, '›', `aria-label="Keyingi sahifa" ${data.page >= data.pages ? 'disabled' : ''}`);
+}
+
+function reloadStudentsFromFirstPage() {
+    studentState.page = 1;
+    loadStudents();
+}
+
+document.getElementById('stu-test').addEventListener('change', (e) => {
+    Object.assign(studentState, { testId: e.target.value, region: '', status: '' });
+    fillStudentSorts();
+    reloadStudentsFromFirstPage();
+});
+document.getElementById('stu-q').addEventListener('input', (e) => {
+    clearTimeout(studentSearchTimer);
+    studentSearchTimer = setTimeout(() => {
+        studentState.q = e.target.value.trim();
+        reloadStudentsFromFirstPage();
+    }, 300);
+});
+document.getElementById('stu-region').addEventListener('change', (e) => {
+    studentState.region = e.target.value;
+    reloadStudentsFromFirstPage();
+});
+document.getElementById('stu-sort').addEventListener('change', (e) => {
+    studentState.sort = e.target.value;
+    reloadStudentsFromFirstPage();
+});
+document.getElementById('stu-size').addEventListener('change', (e) => {
+    studentState.pageSize = Number(e.target.value);
+    reloadStudentsFromFirstPage();
+});
+document.getElementById('stu-tabs').addEventListener('click', (e) => {
+    const tab = e.target.closest('.tab');
+    if (!tab) return;
+    studentState.status = tab.dataset.status;
+    reloadStudentsFromFirstPage();
+});
+document.getElementById('stu-pages').addEventListener('click', (e) => {
+    const button = e.target.closest('.pager-btn');
+    if (!button || button.disabled) return;
+    studentState.page = Number(button.dataset.page);
+    loadStudents();
+    document.getElementById('students-page').scrollIntoView({ block: 'start', behavior: 'smooth' });
+});

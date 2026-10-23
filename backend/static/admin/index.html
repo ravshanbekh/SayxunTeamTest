@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=Unbounded:wght@500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="vendor/flatpickr/flatpickr.min.css">
-    <link rel="stylesheet" href="css/admin.css?v=11">
+    <link rel="stylesheet" href="css/admin.css?v=12">
 </head>
 
 <body>
@@ -62,6 +62,9 @@
                 <li><a href="#" data-page="prezident">
                     <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 10 12 5 2 10l10 5 10-5z"/><path d="M6 12v5c3 2.5 9 2.5 12 0v-5"/></svg>
                     Prezident maktabi</a></li>
+                <li><a href="#" data-page="students">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/></svg>
+                    O'quvchilar</a></li>
                 <li><a href="#" data-page="payments">
                     <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/><path d="M6 15h4"/></svg>
                     To'lovlar <span class="nav-badge hidden" id="payments-badge">0</span></a></li>
@@ -119,6 +122,62 @@
                         Yangi test</button>
                 </header>
                 <div class="tests-list" id="prezident-list"></div>
+            </div>
+
+            <!-- O'quvchilar -->
+            <div class="page" id="students-page">
+                <header class="page-head">
+                    <div class="page-title">
+                        <img class="illus" src="../brand/icon-students.webp" width="192" height="192" alt="">
+                        <div>
+                        <h1>O'quvchilar</h1>
+                        <p>Botda ro'yxatdan o'tgan o'quvchilar. Testni tanlasangiz, faqat shu testga kirganlar
+                           holati va natijasi bilan ko'rinadi.</p>
+                        </div>
+                    </div>
+                </header>
+
+                <div class="stu-filters">
+                    <div class="form-group stu-scope">
+                        <label for="stu-test">Ro'yxat</label>
+                        <select id="stu-test" class="select">
+                            <option value="">Barcha o'quvchilar</option>
+                        </select>
+                    </div>
+                    <div class="form-group stu-search">
+                        <label for="stu-q">Qidirish</label>
+                        <input type="search" id="stu-q" placeholder="Ism, familiya yoki Telegram ID" autocomplete="off">
+                    </div>
+                    <div class="form-group">
+                        <label for="stu-region">Viloyat</label>
+                        <select id="stu-region" class="select">
+                            <option value="">Barchasi</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="stu-sort">Saralash</label>
+                        <select id="stu-sort" class="select"></select>
+                    </div>
+                </div>
+
+                <div class="tabs stu-tabs hidden" id="stu-tabs" role="tablist">
+                    <button class="tab is-active" data-status="" role="tab">Hammasi <b data-count="all">0</b></button>
+                    <button class="tab" data-status="submitted" role="tab">Topshirgan <b data-count="submitted">0</b></button>
+                    <button class="tab" data-status="in_progress" role="tab">Jarayonda <b data-count="in_progress">0</b></button>
+                    <button class="tab" data-status="expired" role="tab">Vaqti tugagan <b data-count="expired">0</b></button>
+                </div>
+
+                <div class="stu-table-wrap" id="stu-list" aria-live="polite"></div>
+
+                <div class="stu-pager" id="stu-pager">
+                    <span class="stu-range" id="stu-range"></span>
+                    <nav class="pager" id="stu-pages" aria-label="Sahifalar"></nav>
+                    <label class="stu-size">Sahifada
+                        <select id="stu-size" class="select select-sm">
+                            <option>20</option><option>50</option><option>100</option>
+                        </select>
+                    </label>
+                </div>
             </div>
 
             <!-- To'lovlar -->
@@ -444,7 +503,7 @@
     <script src="js/auth.js?v=2"></script>
     <script src="vendor/flatpickr/flatpickr.min.js"></script>
     <script src="vendor/flatpickr/uz_latn.js"></script>
-    <script src="js/dashboard.js?v=9"></script>
+    <script src="js/dashboard.js?v=10"></script>
 </body>
 
 </html>

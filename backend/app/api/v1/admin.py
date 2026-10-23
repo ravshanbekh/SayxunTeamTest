@@ -43,6 +43,24 @@ async def get_all_students(
     return users
 
 
+@router.get("/students/list")
+async def list_students_endpoint(
+    test_id: Optional[UUID] = None,
+    q: Optional[str] = Query(None, max_length=100),
+    region: Optional[str] = Query(None, max_length=255),
+    state: Optional[str] = Query(None, alias="status", pattern="^(submitted|in_progress|expired)$"),
+    sort: str = Query("newest", pattern="^(newest|oldest|name|tests|score)$"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=200),
+    db: AsyncSession = Depends(get_db),
+    current_admin: AdminUser = Depends(get_current_admin)
+):
+    """O'quvchilar: hammasi yoki bitta testga kirganlar; filtr va sahifalash bilan."""
+    from app.services.student_service import list_students
+    return await list_students(db, test_id=test_id, q=q, region=region, status=state,
+                               sort=sort, page=page, page_size=page_size)
+
+
 @router.get("/written-answers/pending", response_model=List[WrittenAnswerResponse])
 async def get_pending_written_answers(
     test_id: UUID | None = None,
